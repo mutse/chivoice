@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../settings/settings_provider.dart';
 import '../shared/theme.dart';
+import '../transcript/export_service.dart';
 import '../transcript/export_sheet.dart';
-import '../transcript/history_page.dart';
 import '../transcript/transcript_provider.dart';
 import 'mic_button.dart';
 import 'recording_provider.dart';

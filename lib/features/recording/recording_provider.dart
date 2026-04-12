@@ -56,11 +56,13 @@ final apiProxyProvider = Provider<ApiProxy>((ref) {
   return ApiProxy(proxyBaseUrl: settings.proxyUrl);
 });
 
+final liveSttProvider = Provider<SttService>((ref) => OnDeviceStt());
+
 final sttServiceProvider = Provider<SttService>((ref) {
   final settings = ref.watch(settingsProvider);
   switch (settings.provider) {
     case SttProvider.onDevice:
-      return OnDeviceStt();
+      return ref.watch(liveSttProvider);
     case SttProvider.google:
       return GoogleStt(apiProxy: ref.watch(apiProxyProvider));
     case SttProvider.whisper:
@@ -93,7 +95,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
     final settings = ref.read(settingsProvider);
     final recorder = ref.read(audioRecorderServiceProvider);
-    final stt = ref.read(sttServiceProvider);
+    final liveStt = ref.read(liveSttProvider);
 
     try {
       _recordingPath = await recorder.start(
@@ -105,7 +107,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
         state = state.copyWith(elapsedSeconds: state.elapsedSeconds + 1);
       });
       _partialSubscription?.cancel();
-      _partialSubscription = stt
+      _partialSubscription = liveStt
           .streamPartial(languageCode: settings.languageCode)
           .listen(_applyPartial, onError: _handleError);
     } catch (error) {
@@ -126,10 +128,11 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
     final settings = ref.read(settingsProvider);
     final recorder = ref.read(audioRecorderServiceProvider);
+    final liveStt = ref.read(liveSttProvider);
     final stt = ref.read(sttServiceProvider);
 
     try {
-      await stt.stopStreaming();
+      await liveStt.stopStreaming();
       final filePath = await recorder.stop() ?? _recordingPath;
       if (filePath == null) {
         throw const AudioRecorderException('No audio file was recorded.');
@@ -183,11 +186,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
   }
 
   Future<void> _fallbackToOnDevice(String languageCode) async {
-    final fallback = OnDeviceStt();
-    final text = await fallback.transcribe(
-      _recordingPath ?? '',
-      languageCode: languageCode,
-    );
+    final text = state.liveText.trim();
     if (text.isEmpty) {
       _handleError(
         const SttRemoteException(

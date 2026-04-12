@@ -23,28 +23,61 @@ class ExportSheet extends StatelessWidget {
             leading: const Icon(Icons.share),
             title: const Text('Share'),
             onTap: () async {
-              Navigator.pop(context);
-              await exportService.shareText(entry.text);
+              await _runAction(
+                context,
+                label: 'Shared transcript',
+                action: () => exportService.shareText(entry.text),
+              );
             },
           ),
           ListTile(
             leading: const Icon(Icons.picture_as_pdf_outlined),
             title: const Text('Save as PDF'),
             onTap: () async {
-              Navigator.pop(context);
-              await exportService.exportPdf(entry);
+              await _runAction(
+                context,
+                label: 'Opened PDF export',
+                action: () => exportService.exportPdf(entry),
+              );
             },
           ),
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Save to files'),
             onTap: () async {
-              Navigator.pop(context);
-              await exportService.saveTxt(entry.text);
+              await _runAction(
+                context,
+                label: 'Saved text file',
+                action: () => exportService.saveTxt(entry.text),
+              );
             },
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _runAction(
+    BuildContext context, {
+    required String label,
+    required Future<void> Function() action,
+  }) async {
+    Navigator.pop(context);
+    try {
+      await action();
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(label)));
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $error')));
+    }
   }
 }

@@ -71,17 +71,21 @@ void main() {
 
   test('state transitions idle to recording to processing to idle', () async {
     final recorder = _FakeRecorder();
+    final liveStt = _FakeStt(finalText: 'hello world');
     final stt = _FakeStt(finalText: 'hello from voxa');
     final container = ProviderContainer(
       overrides: [
         audioRecorderServiceProvider.overrideWithValue(recorder),
+        liveSttProvider.overrideWithValue(liveStt),
         sttServiceProvider.overrideWithValue(stt),
       ],
     );
     addTearDown(container.dispose);
 
     await container.read(recordingProvider.notifier).startRecording();
+    await Future<void>.delayed(Duration.zero);
     expect(container.read(recordingProvider).status, RecordingStatus.recording);
+    expect(container.read(recordingProvider).liveText, 'Hello world.');
 
     final stopFuture = container
         .read(recordingProvider.notifier)
@@ -102,7 +106,10 @@ void main() {
   test('error path updates state', () async {
     final recorder = _FakeRecorder()..shouldFail = true;
     final container = ProviderContainer(
-      overrides: [audioRecorderServiceProvider.overrideWithValue(recorder)],
+      overrides: [
+        audioRecorderServiceProvider.overrideWithValue(recorder),
+        liveSttProvider.overrideWithValue(_FakeStt()),
+      ],
     );
     addTearDown(container.dispose);
 

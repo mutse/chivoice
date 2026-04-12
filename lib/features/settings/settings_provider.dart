@@ -82,11 +82,27 @@ final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(
 class SettingsNotifier extends Notifier<SettingsState> {
   @override
   SettingsState build() {
-    final stored = ref.read(settingsBoxProvider).get('state');
-    if (stored is Map) {
-      return SettingsState.fromMap(stored);
+    final box = ref.read(settingsBoxProvider);
+    final legacyState = box.get('state');
+    if (legacyState is Map) {
+      final migrated = SettingsState.fromMap(legacyState);
+      _persistFields(migrated);
+      box.delete('state');
+      return migrated;
     }
-    return const SettingsState();
+    return SettingsState(
+      provider: SttProvider.values.firstWhere(
+        (value) => value.name == box.get('provider'),
+        orElse: () => SttProvider.whisper,
+      ),
+      languageCode: box.get('languageCode') as String? ?? 'en-US',
+      sampleRate: SampleRate.values.firstWhere(
+        (value) => value.name == box.get('sampleRate'),
+        orElse: () => SampleRate.k441,
+      ),
+      smartPunctuation: box.get('smartPunctuation') as bool? ?? true,
+      proxyUrl: box.get('proxyUrl') as String? ?? '',
+    );
   }
 
   void updateProvider(SttProvider provider) {
@@ -111,7 +127,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
 
   void _save(SettingsState next) {
     state = next;
-    ref.read(settingsBoxProvider).put('state', next.toMap());
+    _persistFields(next);
+  }
+
+  void _persistFields(SettingsState next) {
+    final box = ref.read(settingsBoxProvider);
+    box.put('provider', next.provider.name);
+    box.put('languageCode', next.languageCode);
+    box.put('sampleRate', next.sampleRate.name);
+    box.put('smartPunctuation', next.smartPunctuation);
+    box.put('proxyUrl', next.proxyUrl);
   }
 }
 

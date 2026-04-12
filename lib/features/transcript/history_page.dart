@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../shared/theme.dart';
-import 'export_service.dart';
-import 'export_sheet.dart';
 import 'transcript_card.dart';
 import 'transcript_provider.dart';
-
-final exportServiceProvider = Provider<ExportService>(
-  (ref) => SystemExportService(),
-);
 
 class HistoryPage extends ConsumerWidget {
   const HistoryPage({super.key});
@@ -69,53 +64,11 @@ class HistoryPage extends ConsumerWidget {
                   },
                   child: TranscriptCard(
                     entry: entry,
-                    onTap: () => _showDetail(context, ref, entry),
+                    onTap: () => context.push('/transcript/${entry.id}'),
                   ),
                 );
               },
             ),
-    );
-  }
-
-  void _showDetail(BuildContext context, WidgetRef ref, TranscriptEntry entry) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: kSurface2,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Transcript',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 12),
-                Text(entry.text, style: Theme.of(context).textTheme.bodyLarge),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: () {
-                    showModalBottomSheet<void>(
-                      context: context,
-                      backgroundColor: kSurface2,
-                      builder: (context) => ExportSheet(
-                        entry: entry,
-                        exportService: ref.read(exportServiceProvider),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.ios_share),
-                  label: const Text('Export'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

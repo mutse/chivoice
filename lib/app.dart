@@ -6,6 +6,7 @@ import 'features/settings/settings_page.dart';
 import 'features/shared/theme.dart';
 import 'features/shared/widgets/tab_bar.dart';
 import 'features/transcript/history_page.dart';
+import 'features/transcript/transcript_detail_sheet.dart';
 
 class VoxaApp extends StatefulWidget {
   const VoxaApp({super.key});
@@ -36,6 +37,15 @@ class _VoxaAppState extends State<VoxaApp> {
             builder: (context, state) => const SettingsPage(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/transcript/:id',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return _BottomSheetPage<void>(
+            child: TranscriptDetailSheet(transcriptId: id),
+          );
+        },
       ),
     ],
   );
@@ -78,6 +88,22 @@ class VoxaScaffold extends StatelessWidget {
           }
         },
       ),
+    );
+  }
+}
+
+class _BottomSheetPage<T> extends Page<T> {
+  const _BottomSheetPage({required this.child});
+
+  final Widget child;
+
+  @override
+  Route<T> createRoute(BuildContext context) {
+    return DialogRoute<T>(
+      context: context,
+      barrierColor: Colors.black54,
+      settings: this,
+      builder: (context) => child,
     );
   }
 }
