@@ -2,7 +2,7 @@
 
 ## Overview
 
-Voxa is a cross-platform Flutter application that records audio via the device microphone, transcribes it in real time using on-device speech recognition, optionally refines the transcript with a cloud AI provider (OpenAI Whisper, Google Speech-to-Text, or Azure/AWS), and lets the user export the result as plain text, PDF, or a share-sheet file. The UI follows the dark-themed, purple-accented design shown in the approved mockup.
+Voxa is a cross-platform Flutter application that records audio via the device microphone, transcribes it in real time using on-device speech recognition, optionally refines the transcript with a cloud AI provider (Groq Whisper, Google Speech-to-Text, or Azure/AWS), and lets the user export the result as plain text, PDF, or a share-sheet file. The UI follows the dark-themed, purple-accented design shown in the approved mockup.
 
 ---
 
@@ -37,7 +37,7 @@ voxa/
       stt/
         stt_service.dart            # Abstract STT interface
         on_device_stt.dart          # speech_to_text implementation
-        whisper_stt.dart            # OpenAI Whisper HTTP implementation
+        whisper_stt.dart            # Groq Whisper HTTP implementation
         google_stt.dart             # Google Speech-to-Text implementation
       api_proxy.dart                # Injects Authorization header; never stores key in app
   test/
@@ -183,9 +183,9 @@ The active implementation is resolved via a Riverpod `Provider` that reads `sett
 
 ### `WhisperStt`
 
-- `POST https://api.openai.com/v1/audio/transcriptions`
-- Multipart form: `file` (`.m4a`), `model: whisper-1`, `language: <code>`
-- Authorization header injected by `ApiProxy` — the API key is **never stored in the app binary**; it is read from a server-side proxy URL configured in settings.
+- `POST https://api.groq.com/openai/v1/audio/transcriptions`
+- Multipart form: `file` (`.m4a`), `model: whisper-large-v3`, `language: <code>`
+- Authorization header uses the Groq API key configured in app settings.
 
 ### `ExportService`
 
@@ -298,7 +298,7 @@ The bottom sheet (`ExportSheet`) presents three `ListTile` options: Share, Save 
 
 | Setting | Widget | Values |
 |---|---|---|
-| AI provider | Custom radio list | Whisper · Google · On-device |
+| AI provider | Custom radio list | Groq Whisper · Google · On-device |
 | Language | Dropdown | EN · ZH · JA · FR · ES · DE (maps to BCP-47 codes) |
 | Sample rate | Slider (3 steps) | 16 kHz · 44.1 kHz · 48 kHz |
 | Smart punctuation | Toggle switch | on / off |

@@ -19,6 +19,7 @@ class SettingsState {
     this.languageCode = 'en-US',
     this.sampleRate = SampleRate.k441,
     this.smartPunctuation = true,
+    this.groqApiKey = '',
     this.proxyUrl = '',
   });
 
@@ -26,6 +27,7 @@ class SettingsState {
   final String languageCode;
   final SampleRate sampleRate;
   final bool smartPunctuation;
+  final String groqApiKey;
   final String proxyUrl;
 
   SettingsState copyWith({
@@ -33,6 +35,7 @@ class SettingsState {
     String? languageCode,
     SampleRate? sampleRate,
     bool? smartPunctuation,
+    String? groqApiKey,
     String? proxyUrl,
   }) {
     return SettingsState(
@@ -40,6 +43,7 @@ class SettingsState {
       languageCode: languageCode ?? this.languageCode,
       sampleRate: sampleRate ?? this.sampleRate,
       smartPunctuation: smartPunctuation ?? this.smartPunctuation,
+      groqApiKey: groqApiKey ?? this.groqApiKey,
       proxyUrl: proxyUrl ?? this.proxyUrl,
     );
   }
@@ -50,6 +54,7 @@ class SettingsState {
       'languageCode': languageCode,
       'sampleRate': sampleRate.name,
       'smartPunctuation': smartPunctuation,
+      'groqApiKey': groqApiKey,
       'proxyUrl': proxyUrl,
     };
   }
@@ -66,6 +71,7 @@ class SettingsState {
         orElse: () => SampleRate.k441,
       ),
       smartPunctuation: map['smartPunctuation'] as bool? ?? true,
+      groqApiKey: map['groqApiKey'] as String? ?? '',
       proxyUrl: map['proxyUrl'] as String? ?? '',
     );
   }
@@ -101,6 +107,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
         orElse: () => SampleRate.k441,
       ),
       smartPunctuation: box.get('smartPunctuation') as bool? ?? true,
+      groqApiKey: box.get('groqApiKey') as String? ?? '',
       proxyUrl: box.get('proxyUrl') as String? ?? '',
     );
   }
@@ -121,6 +128,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
     _save(state.copyWith(smartPunctuation: value));
   }
 
+  void updateGroqApiKey(String value) {
+    _save(state.copyWith(groqApiKey: value.trim()));
+  }
+
   void updateProxyUrl(String value) {
     _save(state.copyWith(proxyUrl: value.trim()));
   }
@@ -136,6 +147,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
     box.put('languageCode', next.languageCode);
     box.put('sampleRate', next.sampleRate.name);
     box.put('smartPunctuation', next.smartPunctuation);
+    box.put('groqApiKey', next.groqApiKey);
     box.put('proxyUrl', next.proxyUrl);
   }
 }

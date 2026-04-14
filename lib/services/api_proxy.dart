@@ -1,14 +1,16 @@
 import 'package:dio/dio.dart';
 
 class ApiProxy {
-  ApiProxy({required this.proxyBaseUrl});
+  ApiProxy({required this.baseUrl, this.headers = const {}});
 
-  final String proxyBaseUrl;
+  final String baseUrl;
+  final Map<String, String> headers;
 
   Dio client() {
     return Dio(
       BaseOptions(
-        baseUrl: proxyBaseUrl,
+        baseUrl: baseUrl,
+        headers: headers,
         connectTimeout: const Duration(seconds: 20),
         receiveTimeout: const Duration(seconds: 40),
       ),

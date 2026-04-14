@@ -51,9 +51,20 @@ final audioRecorderServiceProvider = Provider<AudioRecorderService>(
   (ref) => AudioRecorderService(),
 );
 
-final apiProxyProvider = Provider<ApiProxy>((ref) {
+const groqOpenAiCompatibleBaseUrl = 'https://api.groq.com/openai/v1';
+
+final googleApiProxyProvider = Provider<ApiProxy>((ref) {
   final settings = ref.watch(settingsProvider);
-  return ApiProxy(proxyBaseUrl: settings.proxyUrl);
+  return ApiProxy(baseUrl: settings.proxyUrl);
+});
+
+final groqApiProxyProvider = Provider<ApiProxy>((ref) {
+  final settings = ref.watch(settingsProvider);
+  final headers = <String, String>{};
+  if (settings.groqApiKey.isNotEmpty) {
+    headers['Authorization'] = 'Bearer ${settings.groqApiKey}';
+  }
+  return ApiProxy(baseUrl: groqOpenAiCompatibleBaseUrl, headers: headers);
 });
 
 final liveSttProvider = Provider<SttService>((ref) => OnDeviceStt());
@@ -64,9 +75,9 @@ final sttServiceProvider = Provider<SttService>((ref) {
     case SttProvider.onDevice:
       return ref.watch(liveSttProvider);
     case SttProvider.google:
-      return GoogleStt(apiProxy: ref.watch(apiProxyProvider));
+      return GoogleStt(apiProxy: ref.watch(googleApiProxyProvider));
     case SttProvider.whisper:
-      return WhisperStt(apiProxy: ref.watch(apiProxyProvider));
+      return WhisperStt(apiProxy: ref.watch(groqApiProxyProvider));
   }
 });
 

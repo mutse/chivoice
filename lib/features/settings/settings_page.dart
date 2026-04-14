@@ -20,7 +20,7 @@ class SettingsPage extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
         children: [
           _Section(
-            title: 'AI provider',
+            title: 'Speech provider',
             child: Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -28,13 +28,33 @@ class SettingsPage extends ConsumerWidget {
                 return ChoiceChip(
                   selected: provider == settings.provider,
                   label: Text(switch (provider) {
-                    SttProvider.whisper => 'Whisper',
+                    SttProvider.whisper => 'Groq Whisper',
                     SttProvider.google => 'Google',
                     SttProvider.onDevice => 'On-device',
                   }),
                   onSelected: (_) => notifier.updateProvider(provider),
                 );
               }).toList(),
+            ),
+          ),
+          _Section(
+            title: 'Groq API Key',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Used for Groq cloud transcription with whisper-large-v3.',
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: settings.groqApiKey,
+                  decoration: const InputDecoration(hintText: 'gsk_...'),
+                  obscureText: true,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  onChanged: notifier.updateGroqApiKey,
+                ),
+              ],
             ),
           ),
           _Section(
@@ -86,16 +106,27 @@ class SettingsPage extends ConsumerWidget {
               title: const Text('Enable automatic sentence cleanup'),
             ),
           ),
-          _Section(
-            title: 'Proxy URL',
-            child: TextFormField(
-              initialValue: settings.proxyUrl,
-              decoration: const InputDecoration(
-                hintText: 'https://your-proxy.example.com',
+          if (settings.provider == SttProvider.google)
+            _Section(
+              title: 'Proxy URL',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Used for the Google STT proxy endpoint.'),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: settings.proxyUrl,
+                    decoration: const InputDecoration(
+                      hintText: 'https://your-proxy.example.com',
+                    ),
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    onChanged: notifier.updateProxyUrl,
+                  ),
+                ],
               ),
-              onChanged: notifier.updateProxyUrl,
             ),
-          ),
         ],
       ),
     );

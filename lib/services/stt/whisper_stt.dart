@@ -3,25 +3,36 @@ import 'package:dio/dio.dart';
 import '../api_proxy.dart';
 import 'stt_service.dart';
 
+const groqWhisperModel = 'whisper-large-v3';
+
 class WhisperStt implements SttService {
   WhisperStt({required ApiProxy apiProxy, Dio? dio})
-    : _dio = dio ?? apiProxy.client();
+    : _apiProxy = apiProxy,
+      _dio = dio;
 
-  final Dio _dio;
+  final ApiProxy _apiProxy;
+  final Dio? _dio;
 
   @override
   Future<String> transcribe(
     String audioFilePath, {
     required String languageCode,
   }) async {
+    if (!_apiProxy.headers.containsKey('Authorization')) {
+      throw const SttRemoteException(
+        message: 'Please add your Groq API key in Settings first.',
+      );
+    }
+
+    final dio = _dio ?? _apiProxy.client();
     try {
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(audioFilePath),
-        'model': 'whisper-1',
+        'model': groqWhisperModel,
         'language': languageCode.split('-').first.toLowerCase(),
       });
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/v1/audio/transcriptions',
+      final response = await dio.post<Map<String, dynamic>>(
+        '/audio/transcriptions',
         data: formData,
       );
       return (response.data?['text'] as String? ?? '').trim();

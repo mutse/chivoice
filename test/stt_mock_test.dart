@@ -19,7 +19,10 @@ void main() {
     setUp(() async {
       dio = _MockDio();
       service = WhisperStt(
-        apiProxy: ApiProxy(proxyBaseUrl: 'https://proxy.test'),
+        apiProxy: ApiProxy(
+          baseUrl: 'https://api.groq.com/openai/v1',
+          headers: const {'Authorization': 'Bearer gsk_test'},
+        ),
         dio: dio,
       );
       final dir = await Directory.systemTemp.createTemp('voxa_stt_test');
@@ -33,7 +36,7 @@ void main() {
       ).thenAnswer((invocation) async {
         captured = invocation.namedArguments[#data] as FormData;
         return Response<Map<String, dynamic>>(
-          requestOptions: RequestOptions(path: '/v1/audio/transcriptions'),
+          requestOptions: RequestOptions(path: '/audio/transcriptions'),
           data: {'text': 'Hello world'},
         );
       });
@@ -43,7 +46,7 @@ void main() {
       expect(result, 'Hello world');
       expect(
         captured.fields.any(
-          (field) => field.key == 'model' && field.value == 'whisper-1',
+          (field) => field.key == 'model' && field.value == groqWhisperModel,
         ),
         isTrue,
       );
@@ -61,9 +64,9 @@ void main() {
         () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
       ).thenThrow(
         DioException(
-          requestOptions: RequestOptions(path: '/v1/audio/transcriptions'),
+          requestOptions: RequestOptions(path: '/audio/transcriptions'),
           response: Response(
-            requestOptions: RequestOptions(path: '/v1/audio/transcriptions'),
+            requestOptions: RequestOptions(path: '/audio/transcriptions'),
             statusCode: 401,
             data: 'unauthorized',
           ),
@@ -87,9 +90,9 @@ void main() {
         () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
       ).thenThrow(
         DioException(
-          requestOptions: RequestOptions(path: '/v1/audio/transcriptions'),
+          requestOptions: RequestOptions(path: '/audio/transcriptions'),
           response: Response(
-            requestOptions: RequestOptions(path: '/v1/audio/transcriptions'),
+            requestOptions: RequestOptions(path: '/audio/transcriptions'),
             statusCode: 500,
             data: 'server error',
           ),
@@ -105,6 +108,27 @@ void main() {
             500,
           ),
         ),
+      );
+    });
+
+    test('throws when Groq API key is missing', () async {
+      final withoutKey = WhisperStt(
+        apiProxy: ApiProxy(baseUrl: 'https://api.groq.com/openai/v1'),
+        dio: dio,
+      );
+
+      expect(
+        () => withoutKey.transcribe(file.path, languageCode: 'en-US'),
+        throwsA(
+          isA<SttRemoteException>().having(
+            (error) => error.message,
+            'message',
+            contains('Groq API key'),
+          ),
+        ),
+      );
+      verifyNever(
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
       );
     });
   });
