@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+const groqOpenAiCompatibleBaseUrl = 'https://api.groq.com/openai/v1';
+
 class ApiProxy {
   ApiProxy({required this.baseUrl, this.headers = const {}});
 

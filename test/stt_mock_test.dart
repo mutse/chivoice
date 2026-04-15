@@ -46,7 +46,9 @@ void main() {
       expect(result, 'Hello world');
       expect(
         captured.fields.any(
-          (field) => field.key == 'model' && field.value == groqWhisperModel,
+          (field) =>
+              field.key == 'model' &&
+              field.value == GroqWhisperModel.largeV3.id,
         ),
         isTrue,
       );
@@ -129,6 +131,92 @@ void main() {
       );
       verifyNever(
         () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      );
+    });
+
+    test('uses selected turbo model when requested', () async {
+      late FormData captured;
+      final turboService = WhisperStt(
+        apiProxy: ApiProxy(
+          baseUrl: 'https://api.groq.com/openai/v1',
+          headers: const {'Authorization': 'Bearer gsk_test'},
+        ),
+        model: GroqWhisperModel.largeV3Turbo,
+        dio: dio,
+      );
+      when(
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer((invocation) async {
+        captured = invocation.namedArguments[#data] as FormData;
+        return Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/audio/transcriptions'),
+          data: {'text': 'Hello world'},
+        );
+      });
+
+      await turboService.transcribe(file.path, languageCode: 'en-US');
+
+      expect(
+        captured.fields.any(
+          (field) =>
+              field.key == 'model' &&
+              field.value == GroqWhisperModel.largeV3Turbo.id,
+        ),
+        isTrue,
+      );
+    });
+
+    test(
+      'verifyConnection succeeds when selected model is available',
+      () async {
+        when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            requestOptions: RequestOptions(path: '/models'),
+            data: {
+              'data': [
+                {'id': GroqWhisperModel.largeV3.id},
+                {'id': GroqWhisperModel.largeV3Turbo.id},
+              ],
+            },
+          ),
+        );
+
+        await expectLater(
+          service.verifyConnection(),
+          completion(contains('is available')),
+        );
+      },
+    );
+
+    test('verifyConnection fails when selected model is unavailable', () async {
+      final turboService = WhisperStt(
+        apiProxy: ApiProxy(
+          baseUrl: 'https://api.groq.com/openai/v1',
+          headers: const {'Authorization': 'Bearer gsk_test'},
+        ),
+        model: GroqWhisperModel.largeV3Turbo,
+        dio: dio,
+      );
+      when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/models'),
+          data: {
+            'data': [
+              {'id': GroqWhisperModel.largeV3.id},
+            ],
+          },
+        ),
+      );
+
+      expect(
+        () => turboService.verifyConnection(),
+        throwsA(
+          isA<SttRemoteException>().having(
+            (error) => error.message,
+            'message',
+            contains('not available'),
+          ),
+        ),
       );
     });
   });

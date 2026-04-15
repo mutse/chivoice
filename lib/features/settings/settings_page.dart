@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/api_proxy.dart';
+import '../../services/stt/whisper_stt.dart';
 import 'settings_provider.dart';
 
-class SettingsPage extends ConsumerWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  bool _isTestingGroq = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
 
@@ -43,7 +53,7 @@ class SettingsPage extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Used for Groq cloud transcription with whisper-large-v3.',
+                  'Used for Groq cloud transcription and connection checks.',
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -53,6 +63,48 @@ class SettingsPage extends ConsumerWidget {
                   autocorrect: false,
                   enableSuggestions: false,
                   onChanged: notifier.updateGroqApiKey,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<GroqWhisperModel>(
+                  initialValue: settings.groqModel,
+                  decoration: const InputDecoration(
+                    labelText: 'Groq Whisper Model',
+                  ),
+                  items: GroqWhisperModel.values
+                      .map(
+                        (model) => DropdownMenuItem(
+                          value: model,
+                          child: Text(model.label),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      notifier.updateGroqModel(value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  settings.groqModel.description,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isTestingGroq
+                        ? null
+                        : () => _testGroqConnection(context, settings),
+                    icon: _isTestingGroq
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.network_check),
+                    label: Text(_isTestingGroq ? 'Testing...' : '测试 Groq 连接'),
+                  ),
                 ),
               ],
             ),
@@ -130,6 +182,60 @@ class SettingsPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _testGroqConnection(
+    BuildContext context,
+    SettingsState settings,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (settings.groqApiKey.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Please add your Groq API key before testing.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isTestingGroq = true;
+    });
+
+    try {
+      final service = WhisperStt(
+        apiProxy: ApiProxy(
+          baseUrl: groqOpenAiCompatibleBaseUrl,
+          headers: {'Authorization': 'Bearer ${settings.groqApiKey}'},
+        ),
+        model: settings.groqModel,
+      );
+      final message = await service.verifyConnection();
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+    } on SttRemoteException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('Groq test failed: ${error.message}')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('Groq test failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTestingGroq = false;
+        });
+      }
+    }
   }
 }
 

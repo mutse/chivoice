@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../../services/stt/whisper_stt.dart';
+
 enum SttProvider { whisper, google, onDevice }
 
 enum SampleRate {
@@ -20,6 +22,7 @@ class SettingsState {
     this.sampleRate = SampleRate.k441,
     this.smartPunctuation = true,
     this.groqApiKey = '',
+    this.groqModel = GroqWhisperModel.largeV3,
     this.proxyUrl = '',
   });
 
@@ -28,6 +31,7 @@ class SettingsState {
   final SampleRate sampleRate;
   final bool smartPunctuation;
   final String groqApiKey;
+  final GroqWhisperModel groqModel;
   final String proxyUrl;
 
   SettingsState copyWith({
@@ -36,6 +40,7 @@ class SettingsState {
     SampleRate? sampleRate,
     bool? smartPunctuation,
     String? groqApiKey,
+    GroqWhisperModel? groqModel,
     String? proxyUrl,
   }) {
     return SettingsState(
@@ -44,6 +49,7 @@ class SettingsState {
       sampleRate: sampleRate ?? this.sampleRate,
       smartPunctuation: smartPunctuation ?? this.smartPunctuation,
       groqApiKey: groqApiKey ?? this.groqApiKey,
+      groqModel: groqModel ?? this.groqModel,
       proxyUrl: proxyUrl ?? this.proxyUrl,
     );
   }
@@ -55,6 +61,7 @@ class SettingsState {
       'sampleRate': sampleRate.name,
       'smartPunctuation': smartPunctuation,
       'groqApiKey': groqApiKey,
+      'groqModel': groqModel.name,
       'proxyUrl': proxyUrl,
     };
   }
@@ -72,6 +79,10 @@ class SettingsState {
       ),
       smartPunctuation: map['smartPunctuation'] as bool? ?? true,
       groqApiKey: map['groqApiKey'] as String? ?? '',
+      groqModel: GroqWhisperModel.values.firstWhere(
+        (value) => value.name == map['groqModel'],
+        orElse: () => GroqWhisperModel.largeV3,
+      ),
       proxyUrl: map['proxyUrl'] as String? ?? '',
     );
   }
@@ -108,6 +119,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
       ),
       smartPunctuation: box.get('smartPunctuation') as bool? ?? true,
       groqApiKey: box.get('groqApiKey') as String? ?? '',
+      groqModel: GroqWhisperModel.values.firstWhere(
+        (value) => value.name == box.get('groqModel'),
+        orElse: () => GroqWhisperModel.largeV3,
+      ),
       proxyUrl: box.get('proxyUrl') as String? ?? '',
     );
   }
@@ -132,6 +147,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
     _save(state.copyWith(groqApiKey: value.trim()));
   }
 
+  void updateGroqModel(GroqWhisperModel model) {
+    _save(state.copyWith(groqModel: model));
+  }
+
   void updateProxyUrl(String value) {
     _save(state.copyWith(proxyUrl: value.trim()));
   }
@@ -148,6 +167,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
     box.put('sampleRate', next.sampleRate.name);
     box.put('smartPunctuation', next.smartPunctuation);
     box.put('groqApiKey', next.groqApiKey);
+    box.put('groqModel', next.groqModel.name);
     box.put('proxyUrl', next.proxyUrl);
   }
 }
