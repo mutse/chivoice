@@ -58,7 +58,43 @@ void main() {
         ),
         isTrue,
       );
+      expect(
+        captured.fields.any(
+          (field) => field.key == 'temperature' && field.value == '0',
+        ),
+        isTrue,
+      );
+      expect(
+        captured.fields.any(
+          (field) =>
+              field.key == 'prompt' &&
+              field.value.contains('Transcribe only the words'),
+        ),
+        isTrue,
+      );
       expect(captured.files.single.key, 'file');
+    });
+
+    test('treats known chinese promo phrase as hallucination', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/audio/transcriptions'),
+          data: {'text': '请不吝点赞 订阅 转发 大赏支持明镜与点点栏目'},
+        ),
+      );
+
+      expect(
+        () => service.transcribe(file.path, languageCode: 'zh-CN'),
+        throwsA(
+          isA<SttRemoteException>().having(
+            (error) => error.message,
+            'message',
+            contains('hallucinated'),
+          ),
+        ),
+      );
     });
 
     test('handles 401 response', () async {
