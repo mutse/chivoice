@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../shared/theme.dart';
 import 'transcript_provider.dart';
 
 class TranscriptCard extends StatelessWidget {
@@ -14,24 +13,31 @@ class TranscriptCard extends StatelessWidget {
     final preview = entry.text.length > 120
         ? '${entry.text.substring(0, 120)}...'
         : entry.text;
+    final primary = Theme.of(context).colorScheme.primary;
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
       child: ListTile(
+        contentPadding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
         onTap: onTap,
-        title: Text(preview, maxLines: 3, overflow: TextOverflow.ellipsis),
+        title: Text(
+          preview,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
         subtitle: Padding(
-          padding: const EdgeInsets.only(top: 10),
+          padding: const EdgeInsets.only(top: 12),
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _Badge(label: _relativeTime(entry.createdAt)),
-              _Badge(label: entry.languageCode),
-              _Badge(label: '${entry.wordCount} words'),
+              _Badge(label: _relativeTime(entry.createdAt), color: primary),
+              _Badge(label: entry.languageCode, color: primary),
+              _Badge(label: '${entry.wordCount} 字', color: primary),
             ],
           ),
         ),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }
@@ -39,33 +45,35 @@ class TranscriptCard extends StatelessWidget {
   static String _relativeTime(DateTime dateTime) {
     final diff = DateTime.now().difference(dateTime);
     if (diff.inMinutes < 1) {
-      return 'Just now';
+      return '刚刚';
     }
     if (diff.inHours < 1) {
-      return '${diff.inMinutes} min ago';
+      return '${diff.inMinutes} 分钟前';
     }
     if (diff.inDays < 1) {
-      return '${diff.inHours} hr ago';
+      return '${diff.inHours} 小时前';
     }
-    return '${diff.inDays} day ago';
+    return '${diff.inDays} 天前';
   }
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({required this.label});
+  const _Badge({required this.label, required this.color});
 
   final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: kSurface2,
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        child: Text(label, style: Theme.of(context).textTheme.bodySmall),
       ),
     );
   }

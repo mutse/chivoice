@@ -55,19 +55,27 @@ class _WaveformWidgetState extends State<WaveformWidget> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 88,
+      height: 98,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: _heights
             .map(
               (height) => AnimatedContainer(
-                duration: const Duration(milliseconds: 80),
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                width: 6,
+                duration: const Duration(milliseconds: 90),
+                curve: Curves.easeOut,
+                margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                width: 5,
                 height: height,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(999),
-                  color: widget.activeColor,
+                  gradient: LinearGradient(
+                    colors: [
+                      widget.activeColor.withValues(alpha: 0.55),
+                      widget.activeColor,
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                 ),
               ),
             )

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../shared/theme.dart';
 import 'export_service.dart';
 import 'transcript_provider.dart';
 
@@ -16,43 +17,55 @@ class ExportSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.share),
-            title: const Text('Share'),
-            onTap: () async {
-              await _runAction(
-                context,
-                label: 'Shared transcript',
-                action: () => exportService.shareText(entry.text),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.picture_as_pdf_outlined),
-            title: const Text('Save as PDF'),
-            onTap: () async {
-              await _runAction(
-                context,
-                label: 'Opened PDF export',
-                action: () => exportService.exportPdf(entry),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Save to files'),
-            onTap: () async {
-              await _runAction(
-                context,
-                label: 'Saved text file',
-                action: () => exportService.saveTxt(entry.text),
-              );
-            },
-          ),
-        ],
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: kPanel,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: kPaperLine),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Text('发送与导出', style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.share),
+              title: const Text('分享文本'),
+              onTap: () async {
+                await _runAction(
+                  context,
+                  label: '已调起分享',
+                  action: () => exportService.shareText(entry.text),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('导出 PDF'),
+              onTap: () async {
+                await _runAction(
+                  context,
+                  label: '已打开 PDF 导出',
+                  action: () => exportService.exportPdf(entry),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('保存 TXT'),
+              onTap: () async {
+                await _runAction(
+                  context,
+                  label: '已保存文本文件',
+                  action: () => exportService.saveTxt(entry.text),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
       ),
     );
   }
@@ -77,7 +90,7 @@ class ExportSheet extends StatelessWidget {
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Export failed: $error')));
+      ).showSnackBar(SnackBar(content: Text('导出失败：$error')));
     }
   }
 }

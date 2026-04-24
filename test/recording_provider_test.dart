@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import 'package:voxa/features/recording/audio_recorder_service.dart';
 import 'package:voxa/features/recording/recording_provider.dart';
+import 'package:voxa/features/settings/settings_provider.dart';
 import 'package:voxa/features/transcript/transcript_provider.dart';
 import 'package:voxa/services/stt/stt_service.dart';
 
@@ -81,11 +82,12 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    container.read(settingsProvider.notifier).updateLanguage('en-US');
 
     await container.read(recordingProvider.notifier).startRecording();
     await Future<void>.delayed(Duration.zero);
     expect(container.read(recordingProvider).status, RecordingStatus.recording);
-    expect(container.read(recordingProvider).liveText, 'Hello world.');
+    expect(container.read(recordingProvider).liveText, 'Hello world');
 
     final stopFuture = container
         .read(recordingProvider.notifier)

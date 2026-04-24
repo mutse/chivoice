@@ -5,6 +5,21 @@ import '../../services/stt/whisper_stt.dart';
 
 enum SttProvider { whisper, google, onDevice }
 
+enum AppSkin {
+  bamboo('青竹', 0xFF48624B, 0xFF9EB38B),
+  ink('烟墨', 0xFF45545A, 0xFF9AA8AF),
+  amber('暖砂', 0xFF866341, 0xFFD7B487),
+  pine('松影', 0xFF3F5B4A, 0xFF89A78D),
+  frost('月白', 0xFF64808F, 0xFFC6D8E3),
+  dusk('暮岚', 0xFF705A67, 0xFFC2A9B6);
+
+  const AppSkin(this.label, this.primaryValue, this.secondaryValue);
+
+  final String label;
+  final int primaryValue;
+  final int secondaryValue;
+}
+
 enum SampleRate {
   k16(16000, '16 kHz'),
   k441(44100, '44.1 kHz'),
@@ -18,12 +33,22 @@ enum SampleRate {
 class SettingsState {
   const SettingsState({
     this.provider = SttProvider.whisper,
-    this.languageCode = 'en-US',
+    this.languageCode = 'zh-CN',
     this.sampleRate = SampleRate.k441,
     this.smartPunctuation = true,
     this.groqApiKey = '',
     this.groqModel = GroqWhisperModel.largeV3,
     this.proxyUrl = '',
+    this.periodStrength = 0.8,
+    this.commaStrength = 0.55,
+    this.questionStrength = 0.65,
+    this.exclamationStrength = 0.45,
+    this.ellipsisStrength = 0.25,
+    this.syncPersonalLexicon = true,
+    this.syncSettings = true,
+    this.syncInputHabits = true,
+    this.skin = AppSkin.bamboo,
+    this.lastSyncAt,
   });
 
   final SttProvider provider;
@@ -33,6 +58,16 @@ class SettingsState {
   final String groqApiKey;
   final GroqWhisperModel groqModel;
   final String proxyUrl;
+  final double periodStrength;
+  final double commaStrength;
+  final double questionStrength;
+  final double exclamationStrength;
+  final double ellipsisStrength;
+  final bool syncPersonalLexicon;
+  final bool syncSettings;
+  final bool syncInputHabits;
+  final AppSkin skin;
+  final DateTime? lastSyncAt;
 
   SettingsState copyWith({
     SttProvider? provider,
@@ -42,6 +77,17 @@ class SettingsState {
     String? groqApiKey,
     GroqWhisperModel? groqModel,
     String? proxyUrl,
+    double? periodStrength,
+    double? commaStrength,
+    double? questionStrength,
+    double? exclamationStrength,
+    double? ellipsisStrength,
+    bool? syncPersonalLexicon,
+    bool? syncSettings,
+    bool? syncInputHabits,
+    AppSkin? skin,
+    DateTime? lastSyncAt,
+    bool clearLastSyncAt = false,
   }) {
     return SettingsState(
       provider: provider ?? this.provider,
@@ -51,6 +97,16 @@ class SettingsState {
       groqApiKey: groqApiKey ?? this.groqApiKey,
       groqModel: groqModel ?? this.groqModel,
       proxyUrl: proxyUrl ?? this.proxyUrl,
+      periodStrength: periodStrength ?? this.periodStrength,
+      commaStrength: commaStrength ?? this.commaStrength,
+      questionStrength: questionStrength ?? this.questionStrength,
+      exclamationStrength: exclamationStrength ?? this.exclamationStrength,
+      ellipsisStrength: ellipsisStrength ?? this.ellipsisStrength,
+      syncPersonalLexicon: syncPersonalLexicon ?? this.syncPersonalLexicon,
+      syncSettings: syncSettings ?? this.syncSettings,
+      syncInputHabits: syncInputHabits ?? this.syncInputHabits,
+      skin: skin ?? this.skin,
+      lastSyncAt: clearLastSyncAt ? null : lastSyncAt ?? this.lastSyncAt,
     );
   }
 
@@ -63,6 +119,16 @@ class SettingsState {
       'groqApiKey': groqApiKey,
       'groqModel': groqModel.name,
       'proxyUrl': proxyUrl,
+      'periodStrength': periodStrength,
+      'commaStrength': commaStrength,
+      'questionStrength': questionStrength,
+      'exclamationStrength': exclamationStrength,
+      'ellipsisStrength': ellipsisStrength,
+      'syncPersonalLexicon': syncPersonalLexicon,
+      'syncSettings': syncSettings,
+      'syncInputHabits': syncInputHabits,
+      'skin': skin.name,
+      'lastSyncAt': lastSyncAt?.toIso8601String(),
     };
   }
 
@@ -72,7 +138,7 @@ class SettingsState {
         (value) => value.name == map['provider'],
         orElse: () => SttProvider.whisper,
       ),
-      languageCode: map['languageCode'] as String? ?? 'en-US',
+      languageCode: map['languageCode'] as String? ?? 'zh-CN',
       sampleRate: SampleRate.values.firstWhere(
         (value) => value.name == map['sampleRate'],
         orElse: () => SampleRate.k441,
@@ -84,6 +150,23 @@ class SettingsState {
         orElse: () => GroqWhisperModel.largeV3,
       ),
       proxyUrl: map['proxyUrl'] as String? ?? '',
+      periodStrength: (map['periodStrength'] as num?)?.toDouble() ?? 0.8,
+      commaStrength: (map['commaStrength'] as num?)?.toDouble() ?? 0.55,
+      questionStrength: (map['questionStrength'] as num?)?.toDouble() ?? 0.65,
+      exclamationStrength:
+          (map['exclamationStrength'] as num?)?.toDouble() ?? 0.45,
+      ellipsisStrength: (map['ellipsisStrength'] as num?)?.toDouble() ?? 0.25,
+      syncPersonalLexicon: map['syncPersonalLexicon'] as bool? ?? true,
+      syncSettings: map['syncSettings'] as bool? ?? true,
+      syncInputHabits: map['syncInputHabits'] as bool? ?? true,
+      skin: AppSkin.values.firstWhere(
+        (value) => value.name == map['skin'],
+        orElse: () => AppSkin.bamboo,
+      ),
+      lastSyncAt: switch (map['lastSyncAt']) {
+        final String value when value.isNotEmpty => DateTime.tryParse(value),
+        _ => null,
+      },
     );
   }
 }
@@ -112,7 +195,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
         (value) => value.name == box.get('provider'),
         orElse: () => SttProvider.whisper,
       ),
-      languageCode: box.get('languageCode') as String? ?? 'en-US',
+      languageCode: box.get('languageCode') as String? ?? 'zh-CN',
       sampleRate: SampleRate.values.firstWhere(
         (value) => value.name == box.get('sampleRate'),
         orElse: () => SampleRate.k441,
@@ -124,6 +207,25 @@ class SettingsNotifier extends Notifier<SettingsState> {
         orElse: () => GroqWhisperModel.largeV3,
       ),
       proxyUrl: box.get('proxyUrl') as String? ?? '',
+      periodStrength: (box.get('periodStrength') as num?)?.toDouble() ?? 0.8,
+      commaStrength: (box.get('commaStrength') as num?)?.toDouble() ?? 0.55,
+      questionStrength:
+          (box.get('questionStrength') as num?)?.toDouble() ?? 0.65,
+      exclamationStrength:
+          (box.get('exclamationStrength') as num?)?.toDouble() ?? 0.45,
+      ellipsisStrength:
+          (box.get('ellipsisStrength') as num?)?.toDouble() ?? 0.25,
+      syncPersonalLexicon: box.get('syncPersonalLexicon') as bool? ?? true,
+      syncSettings: box.get('syncSettings') as bool? ?? true,
+      syncInputHabits: box.get('syncInputHabits') as bool? ?? true,
+      skin: AppSkin.values.firstWhere(
+        (value) => value.name == box.get('skin'),
+        orElse: () => AppSkin.bamboo,
+      ),
+      lastSyncAt: switch (box.get('lastSyncAt')) {
+        final String value when value.isNotEmpty => DateTime.tryParse(value),
+        _ => null,
+      },
     );
   }
 
@@ -155,6 +257,59 @@ class SettingsNotifier extends Notifier<SettingsState> {
     _save(state.copyWith(proxyUrl: value.trim()));
   }
 
+  void updatePeriodStrength(double value) {
+    _save(state.copyWith(periodStrength: value));
+  }
+
+  void updateCommaStrength(double value) {
+    _save(state.copyWith(commaStrength: value));
+  }
+
+  void updateQuestionStrength(double value) {
+    _save(state.copyWith(questionStrength: value));
+  }
+
+  void updateExclamationStrength(double value) {
+    _save(state.copyWith(exclamationStrength: value));
+  }
+
+  void updateEllipsisStrength(double value) {
+    _save(state.copyWith(ellipsisStrength: value));
+  }
+
+  void toggleSyncPersonalLexicon(bool value) {
+    _save(state.copyWith(syncPersonalLexicon: value));
+  }
+
+  void toggleSyncSettings(bool value) {
+    _save(state.copyWith(syncSettings: value));
+  }
+
+  void toggleSyncInputHabits(bool value) {
+    _save(state.copyWith(syncInputHabits: value));
+  }
+
+  void updateSkin(AppSkin value) {
+    _save(state.copyWith(skin: value));
+  }
+
+  void markSyncedNow() {
+    _save(state.copyWith(lastSyncAt: DateTime.now()));
+  }
+
+  void resetPunctuationTuning() {
+    _save(
+      state.copyWith(
+        smartPunctuation: true,
+        periodStrength: 0.8,
+        commaStrength: 0.55,
+        questionStrength: 0.65,
+        exclamationStrength: 0.45,
+        ellipsisStrength: 0.25,
+      ),
+    );
+  }
+
   void _save(SettingsState next) {
     state = next;
     _persistFields(next);
@@ -169,14 +324,24 @@ class SettingsNotifier extends Notifier<SettingsState> {
     box.put('groqApiKey', next.groqApiKey);
     box.put('groqModel', next.groqModel.name);
     box.put('proxyUrl', next.proxyUrl);
+    box.put('periodStrength', next.periodStrength);
+    box.put('commaStrength', next.commaStrength);
+    box.put('questionStrength', next.questionStrength);
+    box.put('exclamationStrength', next.exclamationStrength);
+    box.put('ellipsisStrength', next.ellipsisStrength);
+    box.put('syncPersonalLexicon', next.syncPersonalLexicon);
+    box.put('syncSettings', next.syncSettings);
+    box.put('syncInputHabits', next.syncInputHabits);
+    box.put('skin', next.skin.name);
+    box.put('lastSyncAt', next.lastSyncAt?.toIso8601String());
   }
 }
 
 const languageOptions = <String, String>{
-  'en-US': 'EN',
-  'zh-CN': 'ZH',
-  'ja-JP': 'JA',
-  'fr-FR': 'FR',
-  'es-ES': 'ES',
-  'de-DE': 'DE',
+  'zh-CN': '普通话',
+  'en-US': '英语',
+  'ja-JP': '日语',
+  'fr-FR': '法语',
+  'es-ES': '西班牙语',
+  'de-DE': '德语',
 };

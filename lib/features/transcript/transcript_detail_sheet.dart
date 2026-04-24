@@ -26,18 +26,19 @@ class TranscriptDetailSheet extends ConsumerWidget {
             margin: const EdgeInsets.all(12),
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: kSurface2,
+              color: kPanel,
               borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: kPaperLine),
             ),
             child: entry == null
                 ? Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Transcript not found'),
+                      const Text('未找到这条稿件'),
                       const SizedBox(height: 12),
                       FilledButton(
                         onPressed: context.pop,
-                        child: const Text('Close'),
+                        child: const Text('关闭'),
                       ),
                     ],
                   )
@@ -49,7 +50,7 @@ class TranscriptDetailSheet extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              'Transcript',
+                              '稿件详情',
                               style: Theme.of(context).textTheme.headlineMedium,
                             ),
                           ),
@@ -60,7 +61,7 @@ class TranscriptDetailSheet extends ConsumerWidget {
                         ],
                       ),
                       Text(
-                        '${entry.languageCode} · ${entry.wordCount} words',
+                        '${entry.languageCode} · ${entry.wordCount} 字',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 16),
@@ -78,7 +79,7 @@ class TranscriptDetailSheet extends ConsumerWidget {
                         onPressed: () {
                           showModalBottomSheet<void>(
                             context: context,
-                            backgroundColor: kSurface2,
+                            backgroundColor: Colors.transparent,
                             builder: (context) => ExportSheet(
                               entry: entry,
                               exportService: ref.read(exportServiceProvider),
@@ -86,7 +87,7 @@ class TranscriptDetailSheet extends ConsumerWidget {
                           );
                         },
                         icon: const Icon(Icons.ios_share),
-                        label: const Text('Export'),
+                        label: const Text('导出'),
                       ),
                     ],
                   ),
