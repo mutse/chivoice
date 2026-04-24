@@ -97,6 +97,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
   Timer? _timer;
   StreamSubscription<String>? _partialSubscription;
   String? _recordingPath;
+  bool _isLiveStreaming = false;
 
   @override
   RecordingState build() {
@@ -114,7 +115,6 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
     final settings = ref.read(settingsProvider);
     final recorder = ref.read(audioRecorderServiceProvider);
-    final liveStt = ref.read(liveSttProvider);
 
     try {
       _recordingPath = await recorder.start(
@@ -126,9 +126,13 @@ class RecordingNotifier extends Notifier<RecordingState> {
         state = state.copyWith(elapsedSeconds: state.elapsedSeconds + 1);
       });
       _partialSubscription?.cancel();
-      _partialSubscription = liveStt
-          .streamPartial(languageCode: settings.languageCode)
-          .listen(_applyPartial, onError: _handleError);
+      _isLiveStreaming = settings.provider == SttProvider.onDevice;
+      if (_isLiveStreaming) {
+        final liveStt = ref.read(liveSttProvider);
+        _partialSubscription = liveStt
+            .streamPartial(languageCode: settings.languageCode)
+            .listen(_applyPartial, onError: _handleError);
+      }
     } catch (error) {
       _handleError(error);
     }
@@ -151,7 +155,10 @@ class RecordingNotifier extends Notifier<RecordingState> {
     final stt = ref.read(sttServiceProvider);
 
     try {
-      await liveStt.stopStreaming();
+      if (_isLiveStreaming) {
+        await liveStt.stopStreaming();
+      }
+      _isLiveStreaming = false;
       final filePath = await recorder.stop() ?? _recordingPath;
       if (filePath == null) {
         throw const AudioRecorderException('No audio file was recorded.');
@@ -265,6 +272,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
   void _handleError(Object error) {
     _timer?.cancel();
+    _isLiveStreaming = false;
     state = state.copyWith(
       status: RecordingStatus.error,
       errorMessage: error.toString(),

@@ -56,6 +56,16 @@ class _FakeStt implements SttService {
   Future<void> stopStreaming() async {}
 }
 
+class _ThrowingPartialStt extends _FakeStt {
+  bool streamRequested = false;
+
+  @override
+  Stream<String> streamPartial({required String languageCode}) async* {
+    streamRequested = true;
+    throw Exception('error_language_not_supported');
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -68,6 +78,11 @@ void main() {
     if (!Hive.isBoxOpen('transcripts')) {
       await Hive.openBox<dynamic>('transcripts');
     }
+  });
+
+  setUp(() async {
+    await Hive.box<dynamic>('settings').clear();
+    await Hive.box<dynamic>('transcripts').clear();
   });
 
   test('state transitions idle to recording to processing to idle', () async {
@@ -87,7 +102,7 @@ void main() {
     await container.read(recordingProvider.notifier).startRecording();
     await Future<void>.delayed(Duration.zero);
     expect(container.read(recordingProvider).status, RecordingStatus.recording);
-    expect(container.read(recordingProvider).liveText, 'Hello world');
+    expect(container.read(recordingProvider).liveText, isEmpty);
 
     final stopFuture = container
         .read(recordingProvider.notifier)
@@ -104,6 +119,41 @@ void main() {
     expect(state.liveText, 'Hello from voxa.');
     expect(container.read(transcriptProvider), isNotEmpty);
   });
+
+  test(
+    'cloud recording skips unsupported on-device partial recognition',
+    () async {
+      final recorder = _FakeRecorder();
+      final liveStt = _ThrowingPartialStt();
+      final stt = _FakeStt(finalText: '今天天气真好');
+      final container = ProviderContainer(
+        overrides: [
+          audioRecorderServiceProvider.overrideWithValue(recorder),
+          liveSttProvider.overrideWithValue(liveStt),
+          sttServiceProvider.overrideWithValue(stt),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(settingsProvider.notifier)
+        ..updateProvider(SttProvider.whisper)
+        ..updateLanguage('zh-CN');
+
+      await container.read(recordingProvider.notifier).startRecording();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        container.read(recordingProvider).status,
+        RecordingStatus.recording,
+      );
+      expect(liveStt.streamRequested, isFalse);
+
+      await container.read(recordingProvider.notifier).stopRecording();
+
+      final state = container.read(recordingProvider);
+      expect(state.status, RecordingStatus.idle);
+      expect(state.liveText, '今天天气真好。');
+    },
+  );
 
   test('error path updates state', () async {
     final recorder = _FakeRecorder()..shouldFail = true;
