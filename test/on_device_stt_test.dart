@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
-import 'package:voxa/services/stt/on_device_stt.dart';
+import 'package:chivoice/services/stt/on_device_stt.dart';
 
 class _FakeSpeechToText extends SpeechToText {
   _FakeSpeechToText() : super.withMethodChannel();

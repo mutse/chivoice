@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:voxa/features/transcript/export_service.dart';
-import 'package:voxa/features/transcript/transcript_provider.dart';
+import 'package:chivoice/features/transcript/export_service.dart';
+import 'package:chivoice/features/transcript/transcript_provider.dart';
 
 void main() {
   group('SystemExportService', () {

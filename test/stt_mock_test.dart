@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:voxa/services/api_proxy.dart';
-import 'package:voxa/services/stt/whisper_stt.dart';
+import 'package:chivoice/services/api_proxy.dart';
+import 'package:chivoice/services/stt/whisper_stt.dart';
 
 class _MockDio extends Mock implements Dio {}
 

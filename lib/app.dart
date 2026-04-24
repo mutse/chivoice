@@ -76,7 +76,7 @@ class _VoxaAppState extends ConsumerState<VoxaApp> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     return MaterialApp.router(
-      title: '语音输入法',
+      title: 'chivoice',
       debugShowCheckedModeBanner: false,
       theme: voxaTheme(settings.skin),
       routerConfig: _router,

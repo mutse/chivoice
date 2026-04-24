@@ -4,11 +4,11 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
-import 'package:voxa/features/recording/audio_recorder_service.dart';
-import 'package:voxa/features/recording/recording_provider.dart';
-import 'package:voxa/features/settings/settings_provider.dart';
-import 'package:voxa/features/transcript/transcript_provider.dart';
-import 'package:voxa/services/stt/stt_service.dart';
+import 'package:chivoice/features/recording/audio_recorder_service.dart';
+import 'package:chivoice/features/recording/recording_provider.dart';
+import 'package:chivoice/features/settings/settings_provider.dart';
+import 'package:chivoice/features/transcript/transcript_provider.dart';
+import 'package:chivoice/services/stt/stt_service.dart';
 
 class _FakeRecorder extends AudioRecorderService {
   _FakeRecorder();
@@ -88,7 +88,7 @@ void main() {
   test('state transitions idle to recording to processing to idle', () async {
     final recorder = _FakeRecorder();
     final liveStt = _FakeStt(finalText: 'hello world');
-    final stt = _FakeStt(finalText: 'hello from voxa');
+    final stt = _FakeStt(finalText: 'hello from chivoice');
     final container = ProviderContainer(
       overrides: [
         audioRecorderServiceProvider.overrideWithValue(recorder),
@@ -116,7 +116,7 @@ void main() {
 
     final state = container.read(recordingProvider);
     expect(state.status, RecordingStatus.idle);
-    expect(state.liveText, 'Hello from voxa.');
+    expect(state.liveText, 'Hello from chivoice.');
     expect(container.read(transcriptProvider), isNotEmpty);
   });
 

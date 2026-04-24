@@ -41,7 +41,7 @@ class AboutPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      '语音输入法',
+                      'chivoice',
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 6),
@@ -51,7 +51,7 @@ class AboutPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      '语音输入，轻松表达。\n这次改造围绕“像输入法一样自然说话”展开，把录音、整理、编辑、同步与皮肤体验串成了一条完整链路。',
+                      '语音输入，轻松表达。\nchivoice 围绕“像输入法一样自然说话”展开，把录音、整理、编辑、同步与皮肤体验串成了一条完整链路。',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
