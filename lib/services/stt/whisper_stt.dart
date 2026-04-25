@@ -33,6 +33,32 @@ class WhisperStt implements SttService {
   final ApiProxy _apiProxy;
   final GroqWhisperModel model;
   final Dio? _dio;
+  static const String _antiHallucinationPrompt =
+      'Transcribe only the words that are actually spoken in the audio. '
+      'If there is no clear speech, return an empty string. '
+      'Do not add promotional endings, captions, or imagined content.';
+  static const Set<String> _knownHallucinationPhrases = {
+    '请不吝点赞订阅转发打赏支持明镜与点点栏目',
+    '请不吝点赞订阅转发大赏支持明镜与点点栏目',
+    '請不吝點讚訂閱轉發打賞支持明鏡與點點欄目',
+    '請不吝點讚訂閱轉發大賞支持明鏡與點點欄目',
+  };
+  static const List<String> _hallucinationKeywords = [
+    '点赞',
+    '點讚',
+    '订阅',
+    '訂閱',
+    '转发',
+    '轉發',
+    '打赏',
+    '打賞',
+    '大赏',
+    '大賞',
+    '明镜',
+    '明鏡',
+    '点点栏目',
+    '點點欄目',
+  ];
 
   @override
   Future<String> transcribe(
@@ -51,12 +77,21 @@ class WhisperStt implements SttService {
         'file': await MultipartFile.fromFile(audioFilePath),
         'model': model.id,
         'language': languageCode.split('-').first.toLowerCase(),
+        'temperature': '0',
+        'prompt': _antiHallucinationPrompt,
       });
       final response = await dio.post<Map<String, dynamic>>(
         '/audio/transcriptions',
         data: formData,
       );
-      return (response.data?['text'] as String? ?? '').trim();
+      final text = (response.data?['text'] as String? ?? '').trim();
+      if (_isLikelyHallucinatedPromo(text)) {
+        throw const SttRemoteException(
+          message:
+              'Cloud transcription returned likely hallucinated promo content.',
+        );
+      }
+      return text;
     } on DioException catch (error) {
       throw SttRemoteException(
         statusCode: error.response?.statusCode,
@@ -110,6 +145,30 @@ class WhisperStt implements SttService {
 
   String _errorMessage(DioException error) {
     return error.response?.data?.toString() ?? error.message ?? 'Unknown error';
+  }
+
+  bool _isLikelyHallucinatedPromo(String text) {
+    if (text.isEmpty) {
+      return false;
+    }
+    final normalized = _normalizeForMatch(text);
+    if (_knownHallucinationPhrases.contains(normalized)) {
+      return true;
+    }
+    if (normalized.length > 40) {
+      return false;
+    }
+    final hitCount = _hallucinationKeywords
+        .where((keyword) => normalized.contains(keyword))
+        .length;
+    return hitCount >= 4;
+  }
+
+  String _normalizeForMatch(String value) {
+    return value
+        .replaceAll(RegExp(r'\s+'), '')
+        .replaceAll(RegExp(r'[，。！？；：,.!?;:、"“”‘’()（）\[\]{}]'), '')
+        .trim();
   }
 }
 

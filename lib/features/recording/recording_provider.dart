@@ -20,6 +20,7 @@ class RecordingState {
     this.liveText = '',
     this.elapsedSeconds = 0,
     this.wordCount = 0,
+    this.transcriptId,
     this.errorMessage,
   });
 
@@ -27,6 +28,7 @@ class RecordingState {
   final String liveText;
   final int elapsedSeconds;
   final int wordCount;
+  final String? transcriptId;
   final String? errorMessage;
 
   RecordingState copyWith({
@@ -34,14 +36,19 @@ class RecordingState {
     String? liveText,
     int? elapsedSeconds,
     int? wordCount,
+    String? transcriptId,
     String? errorMessage,
     bool clearError = false,
+    bool clearTranscriptId = false,
   }) {
     return RecordingState(
       status: status ?? this.status,
       liveText: liveText ?? this.liveText,
       elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
       wordCount: wordCount ?? this.wordCount,
+      transcriptId: clearTranscriptId
+          ? null
+          : transcriptId ?? this.transcriptId,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
@@ -90,6 +97,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
   Timer? _timer;
   StreamSubscription<String>? _partialSubscription;
   String? _recordingPath;
+  bool _isLiveStreaming = false;
 
   @override
   RecordingState build() {
@@ -107,7 +115,6 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
     final settings = ref.read(settingsProvider);
     final recorder = ref.read(audioRecorderServiceProvider);
-    final liveStt = ref.read(liveSttProvider);
 
     try {
       _recordingPath = await recorder.start(
@@ -119,9 +126,13 @@ class RecordingNotifier extends Notifier<RecordingState> {
         state = state.copyWith(elapsedSeconds: state.elapsedSeconds + 1);
       });
       _partialSubscription?.cancel();
-      _partialSubscription = liveStt
-          .streamPartial(languageCode: settings.languageCode)
-          .listen(_applyPartial, onError: _handleError);
+      _isLiveStreaming = settings.provider == SttProvider.onDevice;
+      if (_isLiveStreaming) {
+        final liveStt = ref.read(liveSttProvider);
+        _partialSubscription = liveStt
+            .streamPartial(languageCode: settings.languageCode)
+            .listen(_applyPartial, onError: _handleError);
+      }
     } catch (error) {
       _handleError(error);
     }
@@ -144,7 +155,10 @@ class RecordingNotifier extends Notifier<RecordingState> {
     final stt = ref.read(sttServiceProvider);
 
     try {
-      await liveStt.stopStreaming();
+      if (_isLiveStreaming) {
+        await liveStt.stopStreaming();
+      }
+      _isLiveStreaming = false;
       final filePath = await recorder.stop() ?? _recordingPath;
       if (filePath == null) {
         throw const AudioRecorderException('No audio file was recorded.');
@@ -162,7 +176,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
         throw const SpeechRecognitionException('No speech was detected.');
       }
 
-      final cleaned = _formatText(text, settings.smartPunctuation);
+      final cleaned = _formatText(text, settings, finalize: true);
       final entry = TranscriptEntry(
         id: const Uuid().v4(),
         text: cleaned,
@@ -175,6 +189,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
         status: RecordingStatus.idle,
         liveText: cleaned,
         wordCount: entry.wordCount,
+        transcriptId: entry.id,
       );
     } catch (error) {
       if (settings.provider != SttProvider.onDevice) {
@@ -189,11 +204,38 @@ class RecordingNotifier extends Notifier<RecordingState> {
     state = state.copyWith(clearError: true, status: RecordingStatus.idle);
   }
 
-  void _applyPartial(String value) {
-    final cleaned = _formatText(
-      value,
-      ref.read(settingsProvider).smartPunctuation,
+  void updateDraftText(String value) {
+    final cleaned = value.trimRight();
+    state = state.copyWith(
+      liveText: cleaned,
+      wordCount: _countWords(cleaned),
+      clearError: true,
     );
+
+    final transcriptId = state.transcriptId;
+    if (transcriptId == null || cleaned.trim().isEmpty) {
+      return;
+    }
+
+    final entry = ref.read(transcriptByIdProvider(transcriptId));
+    if (entry == null) {
+      return;
+    }
+    ref
+        .read(transcriptProvider.notifier)
+        .update(entry.copyWith(text: cleaned, wordCount: _countWords(cleaned)));
+  }
+
+  void deleteCurrentDraft() {
+    final transcriptId = state.transcriptId;
+    if (transcriptId != null) {
+      ref.read(transcriptProvider.notifier).delete(transcriptId);
+    }
+    state = const RecordingState();
+  }
+
+  void _applyPartial(String value) {
+    final cleaned = _formatText(value, ref.read(settingsProvider));
     state = state.copyWith(liveText: cleaned, wordCount: _countWords(cleaned));
   }
 
@@ -208,10 +250,8 @@ class RecordingNotifier extends Notifier<RecordingState> {
       );
       return;
     }
-    final cleaned = _formatText(
-      text,
-      ref.read(settingsProvider).smartPunctuation,
-    );
+    final settings = ref.read(settingsProvider);
+    final cleaned = _formatText(text, settings, finalize: true);
     final entry = TranscriptEntry(
       id: const Uuid().v4(),
       text: cleaned,
@@ -224,6 +264,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
       status: RecordingStatus.idle,
       liveText: cleaned,
       wordCount: entry.wordCount,
+      transcriptId: entry.id,
       errorMessage:
           'Cloud transcription failed. Switched to on-device fallback.',
     );
@@ -231,26 +272,108 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
   void _handleError(Object error) {
     _timer?.cancel();
+    _isLiveStreaming = false;
     state = state.copyWith(
       status: RecordingStatus.error,
       errorMessage: error.toString(),
     );
   }
 
-  static String _formatText(String value, bool punctuation) {
+  static String _formatText(
+    String value,
+    SettingsState settings, {
+    bool finalize = false,
+  }) {
     final trimmed = value.trim();
-    if (!punctuation || trimmed.isEmpty) {
+    if (trimmed.isEmpty) {
       return trimmed;
     }
-    final normalized = '${trimmed[0].toUpperCase()}${trimmed.substring(1)}'
-        .replaceAll(' ,', ',');
-    return normalized.endsWith('.') ? normalized : '$normalized.';
+
+    var normalized = trimmed
+        .replaceAll(RegExp(r'\s+([,.!?])'), r'$1')
+        .replaceAll(RegExp(r'\s+([，。！？；：])'), r'$1');
+
+    final usesCjk = _usesCjkFormatting(settings.languageCode, normalized);
+    if (!usesCjk) {
+      normalized = '${normalized[0].toUpperCase()}${normalized.substring(1)}';
+    }
+
+    if (!settings.smartPunctuation || !finalize) {
+      return normalized;
+    }
+
+    if (_hasTerminalPunctuation(normalized)) {
+      return normalized;
+    }
+
+    final terminal = _chooseTerminalPunctuation(normalized, settings, usesCjk);
+    return '$normalized$terminal';
   }
 
   static int _countWords(String value) {
-    if (value.trim().isEmpty) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
       return 0;
     }
-    return value.trim().split(RegExp(r'\s+')).length;
+
+    final hanCount = RegExp(r'[\u4E00-\u9FFF]').allMatches(trimmed).length;
+    if (hanCount > 0 && !trimmed.contains(RegExp(r'\s'))) {
+      return hanCount;
+    }
+
+    return trimmed.split(RegExp(r'\s+')).length;
+  }
+
+  static bool _usesCjkFormatting(String languageCode, String value) {
+    return languageCode.startsWith('zh') ||
+        languageCode.startsWith('ja') ||
+        RegExp(r'[\u3040-\u30FF\u4E00-\u9FFF]').hasMatch(value);
+  }
+
+  static bool _hasTerminalPunctuation(String value) {
+    return value.endsWith('.') ||
+        value.endsWith('!') ||
+        value.endsWith('?') ||
+        value.endsWith('...') ||
+        value.endsWith('。') ||
+        value.endsWith('！') ||
+        value.endsWith('？') ||
+        value.endsWith('……');
+  }
+
+  static String _chooseTerminalPunctuation(
+    String value,
+    SettingsState settings,
+    bool usesCjk,
+  ) {
+    if (_looksLikeQuestion(value) && settings.questionStrength >= 0.4) {
+      return usesCjk ? '？' : '?';
+    }
+    if (_looksExcited(value) && settings.exclamationStrength >= 0.4) {
+      return usesCjk ? '！' : '!';
+    }
+    if (value.length > 42 && settings.ellipsisStrength >= 0.7) {
+      return usesCjk ? '……' : '...';
+    }
+    if (settings.periodStrength <= 0.2) {
+      return '';
+    }
+    return usesCjk ? '。' : '.';
+  }
+
+  static bool _looksLikeQuestion(String value) {
+    final lower = value.toLowerCase();
+    return RegExp(
+      r'(吗|么|呢|何时|为什么|怎么|是否|是不是|能不能|可不可以|who|what|when|where|why|how|can|should)',
+      caseSensitive: false,
+    ).hasMatch(lower);
+  }
+
+  static bool _looksExcited(String value) {
+    final lower = value.toLowerCase();
+    return RegExp(
+      r'(太好了|真棒|厉害|赶紧|快点|wow|amazing|great|awesome)',
+      caseSensitive: false,
+    ).hasMatch(lower);
   }
 }

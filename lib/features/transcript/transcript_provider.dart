@@ -18,6 +18,22 @@ class TranscriptEntry {
   final String languageCode;
   final int wordCount;
 
+  TranscriptEntry copyWith({
+    String? id,
+    String? text,
+    DateTime? createdAt,
+    String? languageCode,
+    int? wordCount,
+  }) {
+    return TranscriptEntry(
+      id: id ?? this.id,
+      text: text ?? this.text,
+      createdAt: createdAt ?? this.createdAt,
+      languageCode: languageCode ?? this.languageCode,
+      wordCount: wordCount ?? this.wordCount,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -83,6 +99,15 @@ class TranscriptNotifier extends Notifier<List<TranscriptEntry>> {
   void restore(TranscriptEntry entry) {
     state = [entry, ...state]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _persist();
+  }
+
+  void update(TranscriptEntry entry) {
+    state =
+        state
+            .map((current) => current.id == entry.id ? entry : current)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _persist();
   }
 

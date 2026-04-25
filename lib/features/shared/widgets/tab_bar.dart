@@ -14,21 +14,30 @@ class VoxaTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: kSurface2,
-        border: Border(top: BorderSide(color: kSurface3)),
-      ),
-      child: NavigationBar(
-        selectedIndex: currentIndex,
-        backgroundColor: Colors.transparent,
-        indicatorColor: kPurple800,
-        onDestinationSelected: onTap,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.mic_none), label: 'Live'),
-          NavigationDestination(icon: Icon(Icons.history), label: 'History'),
-          NavigationDestination(icon: Icon(Icons.tune), label: 'Settings'),
-        ],
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: kPaperLine),
+          boxShadow: const [
+            BoxShadow(
+              blurRadius: 24,
+              offset: Offset(0, 12),
+              color: Color(0x14000000),
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          selectedIndex: currentIndex,
+          onDestinationSelected: onTap,
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.mic_none), label: '语音'),
+            NavigationDestination(icon: Icon(Icons.auto_stories), label: '稿库'),
+            NavigationDestination(icon: Icon(Icons.tune), label: '设置'),
+          ],
+        ),
       ),
     );
   }

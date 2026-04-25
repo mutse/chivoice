@@ -1,6 +1,6 @@
 {
-    "name": "voxa",
-    "short_name": "voxa",
+    "name": "chivoice",
+    "short_name": "chivoice",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,21 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/recording/recording_page.dart';
+import 'features/settings/about_page.dart';
+import 'features/settings/cloud_sync_page.dart';
+import 'features/settings/punctuation_page.dart';
 import 'features/settings/settings_page.dart';
+import 'features/settings/settings_provider.dart';
+import 'features/settings/skin_center_page.dart';
 import 'features/shared/theme.dart';
 import 'features/shared/widgets/tab_bar.dart';
 import 'features/transcript/history_page.dart';
 import 'features/transcript/transcript_detail_sheet.dart';
 
-class VoxaApp extends StatefulWidget {
+class VoxaApp extends ConsumerStatefulWidget {
   const VoxaApp({super.key});
 
   @override
-  State<VoxaApp> createState() => _VoxaAppState();
+  ConsumerState<VoxaApp> createState() => _VoxaAppState();
 }
 
-class _VoxaAppState extends State<VoxaApp> {
+class _VoxaAppState extends ConsumerState<VoxaApp> {
   late final GoRouter _router = GoRouter(
     initialLocation: '/',
     routes: [
@@ -39,6 +45,22 @@ class _VoxaAppState extends State<VoxaApp> {
         ],
       ),
       GoRoute(
+        path: '/settings/punctuation',
+        builder: (context, state) => const PunctuationPage(),
+      ),
+      GoRoute(
+        path: '/settings/sync',
+        builder: (context, state) => const CloudSyncPage(),
+      ),
+      GoRoute(
+        path: '/settings/skins',
+        builder: (context, state) => const SkinCenterPage(),
+      ),
+      GoRoute(
+        path: '/settings/about',
+        builder: (context, state) => const AboutPage(),
+      ),
+      GoRoute(
         path: '/transcript/:id',
         pageBuilder: (context, state) {
           final id = state.pathParameters['id']!;
@@ -52,10 +74,11 @@ class _VoxaAppState extends State<VoxaApp> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
     return MaterialApp.router(
-      title: 'Voxa',
+      title: 'chivoice',
       debugShowCheckedModeBanner: false,
-      theme: voxaTheme(),
+      theme: voxaTheme(settings.skin),
       routerConfig: _router,
     );
   }
