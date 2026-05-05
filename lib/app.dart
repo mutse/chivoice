@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'features/recording/recording_page.dart';
 import 'features/settings/about_page.dart';
 import 'features/settings/cloud_sync_page.dart';
+import 'features/settings/personal_lexicon_page.dart';
 import 'features/settings/punctuation_page.dart';
 import 'features/settings/settings_page.dart';
 import 'features/settings/settings_provider.dart';
@@ -43,6 +44,10 @@ class _VoxaAppState extends ConsumerState<VoxaApp> {
             builder: (context, state) => const SettingsPage(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/settings/lexicon',
+        builder: (context, state) => const PersonalLexiconPage(),
       ),
       GoRoute(
         path: '/settings/punctuation',

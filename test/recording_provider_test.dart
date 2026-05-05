@@ -155,6 +155,35 @@ void main() {
     },
   );
 
+  test(
+    'applies personal lexicon replacements before saving transcript',
+    () async {
+      final recorder = _FakeRecorder();
+      final stt = _FakeStt(finalText: '小丽帮我整理api文档');
+      final container = ProviderContainer(
+        overrides: [
+          audioRecorderServiceProvider.overrideWithValue(recorder),
+          liveSttProvider.overrideWithValue(_FakeStt()),
+          sttServiceProvider.overrideWithValue(stt),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(settingsProvider.notifier)
+        ..updateProvider(SttProvider.whisper)
+        ..updateLanguage('zh-CN')
+        ..addPersonalLexiconEntry(spokenForm: '小丽', writtenForm: '晓丽')
+        ..addPersonalLexiconEntry(spokenForm: 'api', writtenForm: 'API');
+
+      await container.read(recordingProvider.notifier).startRecording();
+      await Future<void>.delayed(Duration.zero);
+      await container.read(recordingProvider.notifier).stopRecording();
+
+      final state = container.read(recordingProvider);
+      expect(state.liveText, '晓丽帮我整理API文档。');
+      expect(container.read(transcriptProvider).first.text, '晓丽帮我整理API文档。');
+    },
+  );
+
   test('error path updates state', () async {
     final recorder = _FakeRecorder()..shouldFail = true;
     final container = ProviderContainer(
