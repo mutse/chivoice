@@ -8,6 +8,7 @@ import '../../services/stt/google_stt.dart';
 import '../../services/stt/on_device_stt.dart';
 import '../../services/stt/stt_service.dart';
 import '../../services/stt/whisper_stt.dart';
+import '../settings/personal_lexicon.dart';
 import '../settings/settings_provider.dart';
 import '../transcript/transcript_provider.dart';
 import 'audio_recorder_service.dart';
@@ -292,6 +293,10 @@ class RecordingNotifier extends Notifier<RecordingState> {
     var normalized = trimmed
         .replaceAll(RegExp(r'\s+([,.!?])'), r'$1')
         .replaceAll(RegExp(r'\s+([，。！？；：])'), r'$1');
+    normalized = applyPersonalLexicon(
+      normalized,
+      settings.personalLexicon,
+    ).replaceAll(RegExp(r'\s{2,}'), ' ').trim();
 
     final usesCjk = _usesCjkFormatting(settings.languageCode, normalized);
     if (!usesCjk) {

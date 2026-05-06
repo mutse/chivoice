@@ -96,8 +96,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _SettingTile(
                   icon: Icons.auto_stories_outlined,
                   title: '个性化词库',
-                  trailing: '稿库管理',
-                  onTap: () => context.go('/history'),
+                  trailing: settings.personalLexicon.isEmpty
+                      ? '未配置'
+                      : '${settings.personalLexicon.length} 条',
+                  onTap: () => context.push('/settings/lexicon'),
                 ),
               ],
             ),

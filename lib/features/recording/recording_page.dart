@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'draft_rewrite.dart';
 import '../settings/settings_provider.dart';
 import '../shared/theme.dart';
 import '../shared/widgets/ink_wash_background.dart';
@@ -22,6 +23,7 @@ class RecordingPage extends ConsumerStatefulWidget {
 
 class _RecordingPageState extends ConsumerState<RecordingPage> {
   late final TextEditingController _controller = TextEditingController();
+  String? _lastRewriteSnapshot;
 
   @override
   void dispose() {
@@ -118,6 +120,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                           settings: settings,
                           recording: recording,
                         ),
+                        onRewrite: (action) =>
+                            _applyDraftRewrite(action, settings.languageCode),
                         onClear: () => ref
                             .read(recordingProvider.notifier)
                             .updateDraftText(''),
@@ -145,6 +149,8 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
               const SizedBox(height: 18),
               _FeatureShowcase(
                 hasDraft: hasDraft,
+                lexiconCount: settings.personalLexicon.length,
+                onOpenLexicon: () => context.push('/settings/lexicon'),
                 onOpenPunctuation: () => context.push('/settings/punctuation'),
                 onOpenSync: () => context.push('/settings/sync'),
                 onOpenSkins: () => context.push('/settings/skins'),
@@ -163,6 +169,56 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
       selection: TextSelection.collapsed(offset: next.length),
     );
     ref.read(recordingProvider.notifier).updateDraftText(next);
+  }
+
+  void _applyDraftRewrite(DraftRewriteAction action, String languageCode) {
+    final original = _controller.text.trim();
+    if (original.isEmpty) {
+      return;
+    }
+
+    final rewritten = rewriteDraft(
+      original,
+      action: action,
+      languageCode: languageCode,
+    );
+    if (rewritten == original) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('这段内容已经比较利落了，可以直接发送。')));
+      return;
+    }
+
+    _lastRewriteSnapshot = original;
+    _controller.value = TextEditingValue(
+      text: rewritten,
+      selection: TextSelection.collapsed(offset: rewritten.length),
+    );
+    ref.read(recordingProvider.notifier).updateDraftText(rewritten);
+
+    final option = draftRewriteOptions.firstWhere(
+      (item) => item.action == action,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('已应用${option.label}'),
+        action: SnackBarAction(
+          label: '撤销',
+          onPressed: () {
+            final snapshot = _lastRewriteSnapshot;
+            if (snapshot == null) {
+              return;
+            }
+            _controller.value = TextEditingValue(
+              text: snapshot,
+              selection: TextSelection.collapsed(offset: snapshot.length),
+            );
+            ref.read(recordingProvider.notifier).updateDraftText(snapshot);
+            _lastRewriteSnapshot = null;
+          },
+        ),
+      ),
+    );
   }
 
   void _openExportSheet(
@@ -334,6 +390,7 @@ class _DraftState extends StatelessWidget {
     required this.wordCount,
     required this.onChanged,
     required this.onShare,
+    required this.onRewrite,
     required this.onClear,
     required this.onQuickPunctuation,
   });
@@ -342,6 +399,7 @@ class _DraftState extends StatelessWidget {
   final int wordCount;
   final ValueChanged<String> onChanged;
   final VoidCallback onShare;
+  final ValueChanged<DraftRewriteAction> onRewrite;
   final VoidCallback onClear;
   final ValueChanged<String> onQuickPunctuation;
 
@@ -389,6 +447,27 @@ class _DraftState extends StatelessWidget {
                 ),
               )
               .toList(),
+        ),
+        const SizedBox(height: 18),
+        Text('快捷整理', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: draftRewriteOptions
+              .map(
+                (option) => OutlinedButton.icon(
+                  onPressed: () => onRewrite(option.action),
+                  icon: Icon(option.icon, size: 18),
+                  label: Text(option.label),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '灵感参考豆包式语义整理，适合把语音稿顺手修成能直接发出去的文字。',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 18),
         Row(
@@ -492,12 +571,16 @@ class _ModeItem extends StatelessWidget {
 class _FeatureShowcase extends StatelessWidget {
   const _FeatureShowcase({
     required this.hasDraft,
+    required this.lexiconCount,
+    required this.onOpenLexicon,
     required this.onOpenPunctuation,
     required this.onOpenSync,
     required this.onOpenSkins,
   });
 
   final bool hasDraft;
+  final int lexiconCount;
+  final VoidCallback onOpenLexicon;
   final VoidCallback onOpenPunctuation;
   final VoidCallback onOpenSync;
   final VoidCallback onOpenSkins;
@@ -513,6 +596,15 @@ class _FeatureShowcase extends StatelessWidget {
             hasDraft ? '继续完善输入体验' : '功能亮点',
             style: Theme.of(context).textTheme.titleMedium,
           ),
+        ),
+        const SizedBox(height: 12),
+        _FeatureCard(
+          icon: Icons.auto_stories_outlined,
+          title: '个性化词库',
+          subtitle: lexiconCount == 0
+              ? '先把昵称、产品名和行业术语教给 app，识别结果会更稳。'
+              : '已配置 $lexiconCount 条专属纠错规则，转写时会自动替换。',
+          onTap: onOpenLexicon,
         ),
         const SizedBox(height: 12),
         _FeatureCard(

@@ -27,21 +27,27 @@ class AudioRecorderService {
       path: path,
     );
 
-    _amplitudeSubscription?.cancel();
+    _ensureAmplitudeSubscription();
+
+    return path;
+  }
+
+  Future<String?> stop() async {
+    _amplitudeController.add(0);
+    return _recorder.stop();
+  }
+
+  void _ensureAmplitudeSubscription() {
+    if (_amplitudeSubscription != null) {
+      return;
+    }
+
     _amplitudeSubscription = _recorder
         .onAmplitudeChanged(const Duration(milliseconds: 120))
         .listen((amp) {
           final normalized = ((amp.current + 45) / 45).clamp(0.0, 1.0);
           _amplitudeController.add(normalized);
         });
-
-    return path;
-  }
-
-  Future<String?> stop() async {
-    await _amplitudeSubscription?.cancel();
-    _amplitudeController.add(0);
-    return _recorder.stop();
   }
 
   Future<void> dispose() async {

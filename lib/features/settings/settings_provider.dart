@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../services/stt/whisper_stt.dart';
+import 'personal_lexicon.dart';
 
 enum SttProvider { whisper, google, onDevice }
 
@@ -49,6 +51,7 @@ class SettingsState {
     this.syncInputHabits = true,
     this.skin = AppSkin.bamboo,
     this.lastSyncAt,
+    this.personalLexicon = const [],
   });
 
   final SttProvider provider;
@@ -68,6 +71,7 @@ class SettingsState {
   final bool syncInputHabits;
   final AppSkin skin;
   final DateTime? lastSyncAt;
+  final List<PersonalLexiconEntry> personalLexicon;
 
   SettingsState copyWith({
     SttProvider? provider,
@@ -87,6 +91,7 @@ class SettingsState {
     bool? syncInputHabits,
     AppSkin? skin,
     DateTime? lastSyncAt,
+    List<PersonalLexiconEntry>? personalLexicon,
     bool clearLastSyncAt = false,
   }) {
     return SettingsState(
@@ -107,6 +112,7 @@ class SettingsState {
       syncInputHabits: syncInputHabits ?? this.syncInputHabits,
       skin: skin ?? this.skin,
       lastSyncAt: clearLastSyncAt ? null : lastSyncAt ?? this.lastSyncAt,
+      personalLexicon: personalLexicon ?? this.personalLexicon,
     );
   }
 
@@ -129,6 +135,7 @@ class SettingsState {
       'syncInputHabits': syncInputHabits,
       'skin': skin.name,
       'lastSyncAt': lastSyncAt?.toIso8601String(),
+      'personalLexicon': personalLexicon.map((entry) => entry.toMap()).toList(),
     };
   }
 
@@ -167,6 +174,7 @@ class SettingsState {
         final String value when value.isNotEmpty => DateTime.tryParse(value),
         _ => null,
       },
+      personalLexicon: _readLexiconEntries(map['personalLexicon']),
     );
   }
 }
@@ -226,6 +234,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
         final String value when value.isNotEmpty => DateTime.tryParse(value),
         _ => null,
       },
+      personalLexicon: _readLexiconEntries(box.get('personalLexicon')),
     );
   }
 
@@ -293,6 +302,77 @@ class SettingsNotifier extends Notifier<SettingsState> {
     _save(state.copyWith(skin: value));
   }
 
+  void addPersonalLexiconEntry({
+    required String spokenForm,
+    required String writtenForm,
+  }) {
+    final normalizedSpoken = spokenForm.trim();
+    final normalizedWritten = writtenForm.trim();
+    if (normalizedSpoken.isEmpty || normalizedWritten.isEmpty) {
+      return;
+    }
+
+    final next = [...state.personalLexicon];
+    final index = next.indexWhere(
+      (entry) =>
+          entry.spokenForm.trim().toLowerCase() ==
+          normalizedSpoken.toLowerCase(),
+    );
+    final entry = PersonalLexiconEntry(
+      id: index == -1 ? const Uuid().v4() : next[index].id,
+      spokenForm: normalizedSpoken,
+      writtenForm: normalizedWritten,
+      enabled: true,
+    );
+
+    if (index == -1) {
+      next.insert(0, entry);
+    } else {
+      next[index] = entry;
+    }
+
+    _save(state.copyWith(personalLexicon: next));
+  }
+
+  void updatePersonalLexiconEntry(PersonalLexiconEntry nextEntry) {
+    final normalizedSpoken = nextEntry.spokenForm.trim();
+    final normalizedWritten = nextEntry.writtenForm.trim();
+    if (normalizedSpoken.isEmpty || normalizedWritten.isEmpty) {
+      return;
+    }
+
+    final next = state.personalLexicon
+        .map(
+          (entry) => entry.id == nextEntry.id
+              ? nextEntry.copyWith(
+                  spokenForm: normalizedSpoken,
+                  writtenForm: normalizedWritten,
+                )
+              : entry,
+        )
+        .toList();
+    _save(state.copyWith(personalLexicon: next));
+  }
+
+  void togglePersonalLexiconEntry(String id, bool enabled) {
+    final next = state.personalLexicon
+        .map(
+          (entry) => entry.id == id ? entry.copyWith(enabled: enabled) : entry,
+        )
+        .toList();
+    _save(state.copyWith(personalLexicon: next));
+  }
+
+  void deletePersonalLexiconEntry(String id) {
+    _save(
+      state.copyWith(
+        personalLexicon: state.personalLexicon
+            .where((entry) => entry.id != id)
+            .toList(),
+      ),
+    );
+  }
+
   void markSyncedNow() {
     _save(state.copyWith(lastSyncAt: DateTime.now()));
   }
@@ -334,7 +414,19 @@ class SettingsNotifier extends Notifier<SettingsState> {
     box.put('syncInputHabits', next.syncInputHabits);
     box.put('skin', next.skin.name);
     box.put('lastSyncAt', next.lastSyncAt?.toIso8601String());
+    box.put(
+      'personalLexicon',
+      next.personalLexicon.map((entry) => entry.toMap()).toList(),
+    );
   }
+}
+
+List<PersonalLexiconEntry> _readLexiconEntries(Object? raw) {
+  if (raw is! List) {
+    return const [];
+  }
+
+  return raw.whereType<Map>().map(PersonalLexiconEntry.fromMap).toList();
 }
 
 const languageOptions = <String, String>{
