@@ -7,6 +7,19 @@ import 'personal_lexicon.dart';
 
 enum SttProvider { whisper, google, onDevice }
 
+enum AiProvider {
+  groq('Groq', 'https://api.groq.com/openai/v1', 'llama-3.3-70b-versatile'),
+  openai('OpenAI', 'https://api.openai.com/v1', 'gpt-4o-mini'),
+  deepseek('DeepSeek', 'https://api.deepseek.com/v1', 'deepseek-chat'),
+  custom('自定义', '', '');
+
+  const AiProvider(this.label, this.defaultBaseUrl, this.defaultModel);
+
+  final String label;
+  final String defaultBaseUrl;
+  final String defaultModel;
+}
+
 enum AppSkin {
   bamboo('青竹', 0xFF48624B, 0xFF9EB38B),
   ink('烟墨', 0xFF45545A, 0xFF9AA8AF),
@@ -52,6 +65,11 @@ class SettingsState {
     this.skin = AppSkin.bamboo,
     this.lastSyncAt,
     this.personalLexicon = const [],
+    this.aiEnabled = true,
+    this.aiProvider = AiProvider.groq,
+    this.aiBaseUrl = 'https://api.groq.com/openai/v1',
+    this.aiApiKey = '',
+    this.aiModel = 'llama-3.3-70b-versatile',
   });
 
   final SttProvider provider;
@@ -72,6 +90,11 @@ class SettingsState {
   final AppSkin skin;
   final DateTime? lastSyncAt;
   final List<PersonalLexiconEntry> personalLexicon;
+  final bool aiEnabled;
+  final AiProvider aiProvider;
+  final String aiBaseUrl;
+  final String aiApiKey;
+  final String aiModel;
 
   SettingsState copyWith({
     SttProvider? provider,
@@ -92,6 +115,11 @@ class SettingsState {
     AppSkin? skin,
     DateTime? lastSyncAt,
     List<PersonalLexiconEntry>? personalLexicon,
+    bool? aiEnabled,
+    AiProvider? aiProvider,
+    String? aiBaseUrl,
+    String? aiApiKey,
+    String? aiModel,
     bool clearLastSyncAt = false,
   }) {
     return SettingsState(
@@ -113,6 +141,11 @@ class SettingsState {
       skin: skin ?? this.skin,
       lastSyncAt: clearLastSyncAt ? null : lastSyncAt ?? this.lastSyncAt,
       personalLexicon: personalLexicon ?? this.personalLexicon,
+      aiEnabled: aiEnabled ?? this.aiEnabled,
+      aiProvider: aiProvider ?? this.aiProvider,
+      aiBaseUrl: aiBaseUrl ?? this.aiBaseUrl,
+      aiApiKey: aiApiKey ?? this.aiApiKey,
+      aiModel: aiModel ?? this.aiModel,
     );
   }
 
@@ -136,6 +169,11 @@ class SettingsState {
       'skin': skin.name,
       'lastSyncAt': lastSyncAt?.toIso8601String(),
       'personalLexicon': personalLexicon.map((entry) => entry.toMap()).toList(),
+      'aiEnabled': aiEnabled,
+      'aiProvider': aiProvider.name,
+      'aiBaseUrl': aiBaseUrl,
+      'aiApiKey': aiApiKey,
+      'aiModel': aiModel,
     };
   }
 
@@ -175,6 +213,14 @@ class SettingsState {
         _ => null,
       },
       personalLexicon: _readLexiconEntries(map['personalLexicon']),
+      aiEnabled: map['aiEnabled'] as bool? ?? true,
+      aiProvider: AiProvider.values.firstWhere(
+        (value) => value.name == map['aiProvider'],
+        orElse: () => AiProvider.groq,
+      ),
+      aiBaseUrl: map['aiBaseUrl'] as String? ?? AiProvider.groq.defaultBaseUrl,
+      aiApiKey: map['aiApiKey'] as String? ?? '',
+      aiModel: map['aiModel'] as String? ?? AiProvider.groq.defaultModel,
     );
   }
 }
@@ -235,6 +281,14 @@ class SettingsNotifier extends Notifier<SettingsState> {
         _ => null,
       },
       personalLexicon: _readLexiconEntries(box.get('personalLexicon')),
+      aiEnabled: box.get('aiEnabled') as bool? ?? true,
+      aiProvider: AiProvider.values.firstWhere(
+        (value) => value.name == box.get('aiProvider'),
+        orElse: () => AiProvider.groq,
+      ),
+      aiBaseUrl: box.get('aiBaseUrl') as String? ?? AiProvider.groq.defaultBaseUrl,
+      aiApiKey: box.get('aiApiKey') as String? ?? '',
+      aiModel: box.get('aiModel') as String? ?? AiProvider.groq.defaultModel,
     );
   }
 
@@ -390,6 +444,36 @@ class SettingsNotifier extends Notifier<SettingsState> {
     );
   }
 
+  void toggleAiEnabled(bool value) {
+    _save(state.copyWith(aiEnabled: value));
+  }
+
+  void updateAiProvider(AiProvider provider) {
+    if (provider == AiProvider.custom) {
+      _save(state.copyWith(aiProvider: provider));
+      return;
+    }
+    _save(
+      state.copyWith(
+        aiProvider: provider,
+        aiBaseUrl: provider.defaultBaseUrl,
+        aiModel: provider.defaultModel,
+      ),
+    );
+  }
+
+  void updateAiBaseUrl(String value) {
+    _save(state.copyWith(aiBaseUrl: value.trim()));
+  }
+
+  void updateAiApiKey(String value) {
+    _save(state.copyWith(aiApiKey: value.trim()));
+  }
+
+  void updateAiModel(String value) {
+    _save(state.copyWith(aiModel: value.trim()));
+  }
+
   void _save(SettingsState next) {
     state = next;
     _persistFields(next);
@@ -418,6 +502,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
       'personalLexicon',
       next.personalLexicon.map((entry) => entry.toMap()).toList(),
     );
+    box.put('aiEnabled', next.aiEnabled);
+    box.put('aiProvider', next.aiProvider.name);
+    box.put('aiBaseUrl', next.aiBaseUrl);
+    box.put('aiApiKey', next.aiApiKey);
+    box.put('aiModel', next.aiModel);
   }
 }
 

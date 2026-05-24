@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'draft_rewrite.dart';
+import '../ai_studio/ai_studio_sheet.dart';
 import '../settings/settings_provider.dart';
 import '../shared/theme.dart';
 import '../shared/widgets/ink_wash_background.dart';
@@ -122,6 +123,7 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
                         ),
                         onRewrite: (action) =>
                             _applyDraftRewrite(action, settings.languageCode),
+                        onAiStudio: () => _openAiStudio(context),
                         onClear: () => ref
                             .read(recordingProvider.notifier)
                             .updateDraftText(''),
@@ -157,6 +159,46 @@ class _RecordingPageState extends ConsumerState<RecordingPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAiStudio(BuildContext context) async {
+    final original = _controller.text.trim();
+    if (original.isEmpty) {
+      return;
+    }
+    final result = await showAiStudioSheet(context, originalText: original);
+    if (!mounted || result == null || result.isEmpty || result == original) {
+      return;
+    }
+    _lastRewriteSnapshot = original;
+    _controller.value = TextEditingValue(
+      text: result,
+      selection: TextSelection.collapsed(offset: result.length),
+    );
+    ref.read(recordingProvider.notifier).updateDraftText(result);
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('已应用 AI 整理结果'),
+        action: SnackBarAction(
+          label: '撤销',
+          onPressed: () {
+            final snapshot = _lastRewriteSnapshot;
+            if (snapshot == null) {
+              return;
+            }
+            _controller.value = TextEditingValue(
+              text: snapshot,
+              selection: TextSelection.collapsed(offset: snapshot.length),
+            );
+            ref.read(recordingProvider.notifier).updateDraftText(snapshot);
+            _lastRewriteSnapshot = null;
+          },
         ),
       ),
     );
@@ -391,6 +433,7 @@ class _DraftState extends StatelessWidget {
     required this.onChanged,
     required this.onShare,
     required this.onRewrite,
+    required this.onAiStudio,
     required this.onClear,
     required this.onQuickPunctuation,
   });
@@ -400,6 +443,7 @@ class _DraftState extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final VoidCallback onShare;
   final ValueChanged<DraftRewriteAction> onRewrite;
+  final VoidCallback onAiStudio;
   final VoidCallback onClear;
   final ValueChanged<String> onQuickPunctuation;
 
@@ -449,6 +493,18 @@ class _DraftState extends StatelessWidget {
               .toList(),
         ),
         const SizedBox(height: 18),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: controller.text.trim().isEmpty ? null : onAiStudio,
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: const Text('AI 整理'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         Text('快捷整理', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 10),
         Wrap(
