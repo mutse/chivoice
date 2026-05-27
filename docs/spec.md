@@ -1,8 +1,8 @@
-# Voxa — Flutter Voice-to-Text App: Codex Spec
+# ChiVoice — Flutter Voice-to-Text App: Codex Spec
 
 ## Overview
 
-Voxa is a cross-platform Flutter application that records audio via the device microphone, transcribes it in real time using on-device speech recognition, optionally refines the transcript with a cloud AI provider (Groq Whisper, Google Speech-to-Text, or Azure/AWS), and lets the user export the result as plain text, PDF, or a share-sheet file. The UI follows the dark-themed, purple-accented design shown in the approved mockup.
+ChiVoice is a cross-platform Flutter application that records audio via the device microphone, transcribes it in real time using on-device speech recognition, optionally refines the transcript with a cloud AI provider (Groq Whisper, Google Speech-to-Text, or Azure/AWS), and lets the user export the result as plain text, PDF, or a share-sheet file. The UI follows the dark-themed, purple-accented design shown in the approved mockup.
 
 ---
 

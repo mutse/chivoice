@@ -107,6 +107,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ],
             ),
             const SizedBox(height: 16),
+            _SampleRateCard(
+              sampleRate: settings.sampleRate,
+              onChanged: notifier.updateSampleRate,
+            ),
+            const SizedBox(height: 16),
             _GroupCard(
               children: [
                 _SettingTile(
@@ -431,6 +436,99 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       SttProvider.google => '代理模式',
       SttProvider.onDevice => '即时模式',
     };
+  }
+}
+
+class _SampleRateCard extends StatelessWidget {
+  const _SampleRateCard({required this.sampleRate, required this.onChanged});
+
+  final SampleRate sampleRate;
+  final ValueChanged<SampleRate> onChanged;
+
+  static const _values = SampleRate.values;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final index = _values.indexOf(sampleRate);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.graphic_eq, size: 18, color: primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('采样率', style: theme.textTheme.titleMedium),
+                      Text(
+                        '更高采样率音质更好，但占用空间也更多。',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  sampleRate.label,
+                  style: theme.textTheme.titleMedium?.copyWith(color: primary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                showValueIndicator: ShowValueIndicator.onDrag,
+              ),
+              child: Slider(
+                value: index.toDouble(),
+                min: 0,
+                max: (_values.length - 1).toDouble(),
+                divisions: _values.length - 1,
+                label: sampleRate.label,
+                onChanged: (value) => onChanged(_values[value.round()]),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: _values
+                    .map(
+                      (rate) => Text(
+                        rate.label,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: rate == sampleRate
+                              ? primary
+                              : theme.textTheme.bodySmall?.color,
+                          fontWeight: rate == sampleRate
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 }
 
