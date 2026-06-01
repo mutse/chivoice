@@ -7,8 +7,8 @@ let package = Package(
     // TODO: Update your plugin name.
     name: "speech_to_text",
     platforms: [
-        .iOS("12.0"),
-        .macOS("10.14")
+        .iOS("13.0"),
+        .macOS("11.0")
     ],
     products: [
         .library(name: "speech-to-text", targets: ["speech_to_text"])

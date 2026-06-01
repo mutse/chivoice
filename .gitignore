@@ -110,6 +110,9 @@ coverage/
 # Symbols
 app.*.symbols
 
+# Swift Package Manager (vendored plugins)
+**/.build/
+
 # Exceptions to above rules.
 !**/ios/**/default.mode1v3
 !**/ios/**/default.mode2v3
