@@ -87,19 +87,35 @@ const _translateTargets = <String, String>{
 Future<String?> showAiStudioSheet(
   BuildContext context, {
   required String originalText,
+  AiRewriteKind? initialKind,
+  String? initialTargetLanguage,
+  bool autoRunOnOpen = false,
 }) {
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => _AiStudioSheet(originalText: originalText),
+    builder: (context) => _AiStudioSheet(
+      originalText: originalText,
+      initialKind: initialKind,
+      initialTargetLanguage: initialTargetLanguage,
+      autoRunOnOpen: autoRunOnOpen,
+    ),
   );
 }
 
 class _AiStudioSheet extends ConsumerStatefulWidget {
-  const _AiStudioSheet({required this.originalText});
+  const _AiStudioSheet({
+    required this.originalText,
+    this.initialKind,
+    this.initialTargetLanguage,
+    this.autoRunOnOpen = false,
+  });
 
   final String originalText;
+  final AiRewriteKind? initialKind;
+  final String? initialTargetLanguage;
+  final bool autoRunOnOpen;
 
   @override
   ConsumerState<_AiStudioSheet> createState() => _AiStudioSheetState();
@@ -125,8 +141,23 @@ class _AiStudioSheetState extends ConsumerState<_AiStudioSheet> {
     );
     if (detected.hasInstruction) {
       _autoDetected = detected;
+    }
+    if (widget.initialKind != null) {
+      _activeKind = widget.initialKind;
+      _translateTarget = widget.initialTargetLanguage;
+    } else if (detected.hasInstruction) {
       _activeKind = detected.kind;
       _translateTarget = detected.targetLanguage;
+    }
+    if (_activeKind == AiRewriteKind.translate) {
+      _translateTarget ??= 'en';
+    }
+    if (widget.autoRunOnOpen && _activeKind != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _runRewrite();
+        }
+      });
     }
   }
 
@@ -140,9 +171,7 @@ class _AiStudioSheetState extends ConsumerState<_AiStudioSheet> {
       padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
       child: SafeArea(
         child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: mediaQuery.size.height * 0.9,
-          ),
+          constraints: BoxConstraints(maxHeight: mediaQuery.size.height * 0.9),
           child: Container(
             margin: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -257,8 +286,7 @@ class _AiStudioSheetState extends ConsumerState<_AiStudioSheet> {
     });
     if (kind != AiRewriteKind.custom && kind != AiRewriteKind.translate) {
       _runRewrite();
-    } else if (kind == AiRewriteKind.translate &&
-        _translateTarget != null) {
+    } else if (kind == AiRewriteKind.translate && _translateTarget != null) {
       _runRewrite();
     }
   }
@@ -269,9 +297,9 @@ class _AiStudioSheetState extends ConsumerState<_AiStudioSheet> {
       return;
     }
     if (kind == AiRewriteKind.custom && _customInstruction.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先填写自定义指令')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先填写自定义指令')));
       return;
     }
     if (kind == AiRewriteKind.translate && _translateTarget == null) {
@@ -297,8 +325,9 @@ class _AiStudioSheetState extends ConsumerState<_AiStudioSheet> {
         kind: kind,
         languageCode: settings.languageCode,
         targetLanguage: _translateTarget,
-        customInstruction:
-            kind == AiRewriteKind.custom ? _customInstruction : null,
+        customInstruction: kind == AiRewriteKind.custom
+            ? _customInstruction
+            : null,
         temperature: temperature,
       ),
     );
@@ -330,10 +359,7 @@ class _Header extends StatelessWidget {
         children: [
           Icon(Icons.auto_awesome, color: primary, size: 22),
           const SizedBox(width: 10),
-          Text(
-            'AI 整理',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
+          Text('AI 整理', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(width: 10),
           if (autoDetected?.hasInstruction == true)
             Container(
@@ -365,9 +391,7 @@ class _Header extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.orange.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: Colors.orange.withValues(alpha: 0.5),
-                ),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
               ),
               child: const Text(
                 '离线模式',
@@ -446,9 +470,7 @@ class _ActionGrid extends StatelessWidget {
                     : Colors.white.withValues(alpha: 0.62),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: isActive
-                      ? primary
-                      : kPaperLine,
+                  color: isActive ? primary : kPaperLine,
                   width: isActive ? 1.4 : 1,
                 ),
               ),
@@ -493,9 +515,7 @@ class _TranslateTargets extends StatelessWidget {
           selected: isActive,
           onSelected: (_) => onPick(entry.key),
           selectedColor: primary.withValues(alpha: 0.18),
-          side: BorderSide(
-            color: isActive ? primary : kPaperLine,
-          ),
+          side: BorderSide(color: isActive ? primary : kPaperLine),
         );
       }).toList(),
     );
@@ -526,7 +546,9 @@ class _OutputCard extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: usedOffline ? Colors.orange.withValues(alpha: 0.4) : kPaperLine,
+          color: usedOffline
+              ? Colors.orange.withValues(alpha: 0.4)
+              : kPaperLine,
         ),
       ),
       child: Column(
@@ -544,10 +566,7 @@ class _OutputCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  '整理中…',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                Text('整理中…', style: Theme.of(context).textTheme.bodyMedium),
               ],
             )
           else if (text.isEmpty)
@@ -556,17 +575,14 @@ class _OutputCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             )
           else
-            SelectableText(
-              text,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
+            SelectableText(text, style: Theme.of(context).textTheme.bodyLarge),
           if (fallbackReason != null) ...[
             const SizedBox(height: 8),
             Text(
               fallbackReason!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: const Color(0xFFCB6F1A),
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: const Color(0xFFCB6F1A)),
             ),
           ],
         ],
@@ -593,10 +609,7 @@ class _BottomBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton(
-              onPressed: onCancel,
-              child: const Text('取消'),
-            ),
+            child: OutlinedButton(onPressed: onCancel, child: const Text('取消')),
           ),
           const SizedBox(width: 12),
           Expanded(
