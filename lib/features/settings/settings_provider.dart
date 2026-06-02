@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../services/platform/ime_platform_bridge.dart';
 import '../../services/stt/whisper_stt.dart';
 import 'personal_lexicon.dart';
 
@@ -242,9 +245,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
       final migrated = SettingsState.fromMap(legacyState);
       _persistFields(migrated);
       box.delete('state');
+      unawaited(ImePlatformBridge.syncSettings(migrated));
       return migrated;
     }
-    return SettingsState(
+    final initialState = SettingsState(
       provider: SttProvider.values.firstWhere(
         (value) => value.name == box.get('provider'),
         orElse: () => SttProvider.whisper,
@@ -286,10 +290,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
         (value) => value.name == box.get('aiProvider'),
         orElse: () => AiProvider.groq,
       ),
-      aiBaseUrl: box.get('aiBaseUrl') as String? ?? AiProvider.groq.defaultBaseUrl,
+      aiBaseUrl:
+          box.get('aiBaseUrl') as String? ?? AiProvider.groq.defaultBaseUrl,
       aiApiKey: box.get('aiApiKey') as String? ?? '',
       aiModel: box.get('aiModel') as String? ?? AiProvider.groq.defaultModel,
     );
+    unawaited(ImePlatformBridge.syncSettings(initialState));
+    return initialState;
   }
 
   void updateProvider(SttProvider provider) {
@@ -477,6 +484,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
   void _save(SettingsState next) {
     state = next;
     _persistFields(next);
+    unawaited(ImePlatformBridge.syncSettings(next));
   }
 
   void _persistFields(SettingsState next) {

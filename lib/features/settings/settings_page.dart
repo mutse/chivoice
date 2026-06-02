@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../services/ai/openai_compatible_client.dart';
 import '../../services/api_proxy.dart';
+import '../../services/platform/ime_platform_bridge.dart';
 import '../../services/stt/whisper_stt.dart';
 import '../shared/theme.dart';
 import '../shared/widgets/ink_wash_background.dart';
@@ -106,6 +108,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ],
             ),
+            if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
+              const SizedBox(height: 16),
+              const _SystemImeCard(),
+            ],
             const SizedBox(height: 16),
             _SampleRateCard(
               sampleRate: settings.sampleRate,
@@ -145,8 +151,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               settings: settings,
               notifier: notifier,
               showKey: _showAiKey,
-              onToggleKey: () =>
-                  setState(() => _showAiKey = !_showAiKey),
+              onToggleKey: () => setState(() => _showAiKey = !_showAiKey),
               isTesting: _isTestingAi,
               onTest: () => _testAiConnection(context, settings),
             ),
@@ -330,9 +335,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   ) async {
     final messenger = ScaffoldMessenger.of(context);
     if (settings.aiApiKey.trim().isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('请先填写 AI API Key。')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('请先填写 AI API Key。')));
       return;
     }
     setState(() => _isTestingAi = true);
@@ -491,9 +494,9 @@ class _SampleRateCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                showValueIndicator: ShowValueIndicator.onDrag,
-              ),
+              data: SliderTheme.of(
+                context,
+              ).copyWith(showValueIndicator: ShowValueIndicator.onDrag),
               child: Slider(
                 value: index.toDouble(),
                 min: 0,
@@ -617,10 +620,7 @@ class _AiSection extends StatelessWidget {
               children: [
                 Icon(Icons.auto_awesome, color: primary, size: 22),
                 const SizedBox(width: 8),
-                Text(
-                  'AI 智能',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text('AI 智能', style: Theme.of(context).textTheme.titleMedium),
                 const Spacer(),
                 Switch(
                   value: settings.aiEnabled,
@@ -646,9 +646,7 @@ class _AiSection extends StatelessWidget {
                       ? (_) => notifier.updateAiProvider(p)
                       : null,
                   selectedColor: primary.withValues(alpha: 0.18),
-                  side: BorderSide(
-                    color: isActive ? primary : kPaperLine,
-                  ),
+                  side: BorderSide(color: isActive ? primary : kPaperLine),
                 );
               }).toList(),
             ),
@@ -674,9 +672,7 @@ class _AiSection extends StatelessWidget {
                 labelText: 'API Key',
                 hintText: 'sk-...',
                 suffixIcon: IconButton(
-                  icon: Icon(
-                    showKey ? Icons.visibility_off : Icons.visibility,
-                  ),
+                  icon: Icon(showKey ? Icons.visibility_off : Icons.visibility),
                   onPressed: onToggleKey,
                 ),
               ),
@@ -717,6 +713,58 @@ class _AiSection extends StatelessWidget {
             Text(
               'API Key 仅保存在本设备，不会上传 ChiVoice 服务器。',
               style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SystemImeCard extends StatelessWidget {
+  const _SystemImeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.keyboard_voice_outlined, color: primary, size: 22),
+                const SizedBox(width: 8),
+                Text('系统语音输入法', style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Android 现已提供原生 ChiVoice 输入法面板。先去系统里启用，再切换到 ChiVoice，就能在任意输入框里直接说话。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: ImePlatformBridge.openInputMethodSettings,
+                    icon: const Icon(Icons.settings_outlined, size: 18),
+                    label: const Text('前往启用'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: ImePlatformBridge.showInputMethodPicker,
+                    icon: const Icon(Icons.keyboard_outlined, size: 18),
+                    label: const Text('立即切换'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
