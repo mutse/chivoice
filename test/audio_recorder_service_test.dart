@@ -12,6 +12,8 @@ class _SingleListenAmplitudeRecorder extends AudioRecorder {
   int starts = 0;
   int stops = 0;
   bool disposed = false;
+  final List<RecordConfig> startConfigs = [];
+  final List<String> startPaths = [];
 
   @override
   Future<bool> hasPermission() async => true;
@@ -19,6 +21,8 @@ class _SingleListenAmplitudeRecorder extends AudioRecorder {
   @override
   Future<void> start(RecordConfig config, {required String path}) async {
     starts++;
+    startConfigs.add(config);
+    startPaths.add(path);
   }
 
   @override
@@ -76,4 +80,19 @@ void main() {
       expect(recorder.amplitudeStreamRequests, 1);
     },
   );
+
+  test('forwards configured sample rate and uses chivoice file prefix',
+      () async {
+    final recorder = _SingleListenAmplitudeRecorder();
+    final service = AudioRecorderService(recorder: recorder);
+    addTearDown(service.dispose);
+
+    await service.start(sampleRate: 48000);
+    await service.stop();
+
+    expect(recorder.startConfigs.single.sampleRate, 48000);
+    expect(recorder.startConfigs.single.encoder, AudioEncoder.aacLc);
+    expect(recorder.startPaths.single, contains('/chivoice_'));
+    expect(recorder.startPaths.single, endsWith('.m4a'));
+  });
 }

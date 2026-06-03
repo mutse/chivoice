@@ -20,10 +20,10 @@ class AudioRecorderService {
 
     final dir = await getTemporaryDirectory();
     final path =
-        '${dir.path}/voxa_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        '${dir.path}/chivoice_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
     await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc),
+      RecordConfig(encoder: AudioEncoder.aacLc, sampleRate: sampleRate),
       path: path,
     );
 

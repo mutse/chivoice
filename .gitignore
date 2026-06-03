@@ -41,6 +41,7 @@ analysis_benchmark.json
 .pub-preload-cache/
 .pub/
 build/
+.gradle-local/
 flutter_*.png
 linked_*.ds
 unlinked.ds
@@ -109,6 +110,9 @@ coverage/
 
 # Symbols
 app.*.symbols
+
+# Swift Package Manager (vendored plugins)
+**/.build/
 
 # Exceptions to above rules.
 !**/ios/**/default.mode1v3

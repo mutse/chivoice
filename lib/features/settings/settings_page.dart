@@ -1,27 +1,25 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../services/api_proxy.dart';
-import '../../services/stt/whisper_stt.dart';
+import '../../services/platform/ime_platform_bridge.dart';
 import '../shared/theme.dart';
 import '../shared/widgets/ink_wash_background.dart';
+import 'ai_recognition_settings_page.dart';
 import 'settings_provider.dart';
 
-class SettingsPage extends ConsumerStatefulWidget {
+class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
   @override
-  ConsumerState<SettingsPage> createState() => _SettingsPageState();
-}
-
-class _SettingsPageState extends ConsumerState<SettingsPage> {
-  bool _isTestingGroq = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
+    final showNestedAiSettings =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -103,9 +101,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ],
             ),
+            if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
+              const SizedBox(height: 16),
+              const _SystemImeCard(),
+            ],
+            const SizedBox(height: 16),
+            _SampleRateCard(
+              sampleRate: settings.sampleRate,
+              onChanged: notifier.updateSampleRate,
+            ),
             const SizedBox(height: 16),
             _GroupCard(
               children: [
+                if (showNestedAiSettings)
+                  _SettingTile(
+                    icon: Icons.auto_awesome_outlined,
+                    title: 'AI识别配置',
+                    trailing: '查看',
+                    onTap: () => context.push('/settings/ai-recognition'),
+                  ),
                 _SettingTile(
                   icon: Icons.cloud_sync_outlined,
                   title: '云端同步',
@@ -132,92 +146,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '进阶识别配置',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '保留现有识别能力，方便你继续使用 Groq Whisper、Google 代理或本地识别。',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      initialValue: settings.groqApiKey,
-                      decoration: const InputDecoration(
-                        labelText: 'Groq API Key',
-                        hintText: 'gsk_...',
-                      ),
-                      obscureText: true,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      onChanged: notifier.updateGroqApiKey,
-                    ),
-                    const SizedBox(height: 14),
-                    DropdownButtonFormField<GroqWhisperModel>(
-                      initialValue: settings.groqModel,
-                      decoration: const InputDecoration(
-                        labelText: 'Groq Whisper 模型',
-                      ),
-                      items: GroqWhisperModel.values
-                          .map(
-                            (model) => DropdownMenuItem(
-                              value: model,
-                              child: Text(model.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          notifier.updateGroqModel(value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      settings.groqModel.description,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      initialValue: settings.proxyUrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Google 代理地址',
-                        hintText: 'https://your-proxy.example.com',
-                      ),
-                      keyboardType: TextInputType.url,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      onChanged: notifier.updateProxyUrl,
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: _isTestingGroq
-                          ? null
-                          : () => _testGroqConnection(context, settings),
-                      icon: _isTestingGroq
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.network_check),
-                      label: Text(_isTestingGroq ? '测试中…' : '测试 Groq 连接'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            if (!showNestedAiSettings) ...[
+              const SizedBox(height: 16),
+              const AiRecognitionSettingsSection(),
+            ],
           ],
         ),
       ),
@@ -306,56 +238,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Future<void> _testGroqConnection(
-    BuildContext context,
-    SettingsState settings,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    if (settings.groqApiKey.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('请先填写 Groq API Key。')),
-      );
-      return;
-    }
-
-    setState(() {
-      _isTestingGroq = true;
-    });
-
-    try {
-      final service = WhisperStt(
-        apiProxy: ApiProxy(
-          baseUrl: groqOpenAiCompatibleBaseUrl,
-          headers: {'Authorization': 'Bearer ${settings.groqApiKey}'},
-        ),
-        model: settings.groqModel,
-      );
-      final message = await service.verifyConnection();
-      if (!mounted) {
-        return;
-      }
-      messenger.showSnackBar(SnackBar(content: Text(message)));
-    } on SttRemoteException catch (error) {
-      if (!mounted) {
-        return;
-      }
-      messenger.showSnackBar(
-        SnackBar(content: Text('Groq 测试失败：${error.message}')),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      messenger.showSnackBar(SnackBar(content: Text('Groq 测试失败：$error')));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isTestingGroq = false;
-        });
-      }
-    }
-  }
-
   static String _providerLabel(SttProvider provider) {
     return switch (provider) {
       SttProvider.whisper => 'Groq Whisper',
@@ -370,6 +252,99 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       SttProvider.google => '代理模式',
       SttProvider.onDevice => '即时模式',
     };
+  }
+}
+
+class _SampleRateCard extends StatelessWidget {
+  const _SampleRateCard({required this.sampleRate, required this.onChanged});
+
+  final SampleRate sampleRate;
+  final ValueChanged<SampleRate> onChanged;
+
+  static const _values = SampleRate.values;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final index = _values.indexOf(sampleRate);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.graphic_eq, size: 18, color: primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('采样率', style: theme.textTheme.titleMedium),
+                      Text(
+                        '更高采样率音质更好，但占用空间也更多。',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  sampleRate.label,
+                  style: theme.textTheme.titleMedium?.copyWith(color: primary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            SliderTheme(
+              data: SliderTheme.of(
+                context,
+              ).copyWith(showValueIndicator: ShowValueIndicator.onDrag),
+              child: Slider(
+                value: index.toDouble(),
+                min: 0,
+                max: (_values.length - 1).toDouble(),
+                divisions: _values.length - 1,
+                label: sampleRate.label,
+                onChanged: (value) => onChanged(_values[value.round()]),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: _values
+                    .map(
+                      (rate) => Text(
+                        rate.label,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: rate == sampleRate
+                              ? primary
+                              : theme.textTheme.bodySmall?.color,
+                          fontWeight: rate == sampleRate
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -424,6 +399,58 @@ class _SettingTile extends StatelessWidget {
       subtitle: Text(trailing, style: Theme.of(context).textTheme.bodySmall),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
+    );
+  }
+}
+
+class _SystemImeCard extends StatelessWidget {
+  const _SystemImeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.keyboard_voice_outlined, color: primary, size: 22),
+                const SizedBox(width: 8),
+                Text('系统语音输入法', style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Android 现已提供原生 ChiVoice 输入法面板。先去系统里启用，再切换到 ChiVoice，就能在任意输入框里直接说话。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: ImePlatformBridge.openInputMethodSettings,
+                    icon: const Icon(Icons.settings_outlined, size: 18),
+                    label: const Text('前往启用'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: ImePlatformBridge.showInputMethodPicker,
+                    icon: const Icon(Icons.keyboard_outlined, size: 18),
+                    label: const Text('立即切换'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'features/recording/recording_page.dart';
 import 'features/settings/about_page.dart';
+import 'features/settings/ai_recognition_settings_page.dart';
 import 'features/settings/cloud_sync_page.dart';
 import 'features/settings/personal_lexicon_page.dart';
 import 'features/settings/punctuation_page.dart';
@@ -44,6 +45,10 @@ class _VoxaAppState extends ConsumerState<VoxaApp> {
             builder: (context, state) => const SettingsPage(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/settings/ai-recognition',
+        builder: (context, state) => const AiRecognitionSettingsPage(),
       ),
       GoRoute(
         path: '/settings/lexicon',

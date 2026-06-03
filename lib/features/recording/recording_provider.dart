@@ -145,6 +145,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
     }
 
     _timer?.cancel();
+    final recordedSeconds = state.elapsedSeconds;
     state = state.copyWith(
       status: RecordingStatus.processing,
       clearError: true,
@@ -189,6 +190,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
       state = RecordingState(
         status: RecordingStatus.idle,
         liveText: cleaned,
+        elapsedSeconds: recordedSeconds,
         wordCount: entry.wordCount,
         transcriptId: entry.id,
       );
@@ -264,6 +266,7 @@ class RecordingNotifier extends Notifier<RecordingState> {
     state = RecordingState(
       status: RecordingStatus.idle,
       liveText: cleaned,
+      elapsedSeconds: state.elapsedSeconds,
       wordCount: entry.wordCount,
       transcriptId: entry.id,
       errorMessage:

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ime_paper">#F8F2E6</color>
+    <color name="ime_paper_deep">#F1E7D7</color>
+    <color name="ime_paper_line">#E0D2BC</color>
+    <color name="ime_ink">#223025</color>
+    <color name="ime_ink_soft">#687465</color>
+    <color name="ime_panel">#F2FFFCF6</color>
+    <color name="ime_white_72">#B8FFFFFF</color>
+</resources>
