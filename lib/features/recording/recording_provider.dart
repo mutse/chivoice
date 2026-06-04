@@ -64,13 +64,13 @@ final googleApiProxyProvider = Provider<ApiProxy>((ref) {
   return ApiProxy(baseUrl: settings.proxyUrl);
 });
 
-final groqApiProxyProvider = Provider<ApiProxy>((ref) {
+final cloudSttApiProxyProvider = Provider<ApiProxy>((ref) {
   final settings = ref.watch(settingsProvider);
   final headers = <String, String>{};
-  if (settings.groqApiKey.isNotEmpty) {
-    headers['Authorization'] = 'Bearer ${settings.groqApiKey}';
+  if (settings.sttApiKey.isNotEmpty) {
+    headers['Authorization'] = 'Bearer ${settings.sttApiKey}';
   }
-  return ApiProxy(baseUrl: groqOpenAiCompatibleBaseUrl, headers: headers);
+  return ApiProxy(baseUrl: settings.sttBaseUrl, headers: headers);
 });
 
 final liveSttProvider = Provider<SttService>((ref) => OnDeviceStt());
@@ -84,8 +84,9 @@ final sttServiceProvider = Provider<SttService>((ref) {
       return GoogleStt(apiProxy: ref.watch(googleApiProxyProvider));
     case SttProvider.whisper:
       return WhisperStt(
-        apiProxy: ref.watch(groqApiProxyProvider),
-        model: settings.groqModel,
+        apiProxy: ref.watch(cloudSttApiProxyProvider),
+        providerLabel: settings.sttPreset.label,
+        modelId: settings.sttModelId,
       );
   }
 });

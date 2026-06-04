@@ -4,11 +4,54 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../services/api_proxy.dart';
 import '../../services/platform/ime_platform_bridge.dart';
-import '../../services/stt/whisper_stt.dart';
 import 'personal_lexicon.dart';
 
 enum SttProvider { whisper, google, onDevice }
+
+enum SttPreset {
+  groq(
+    'Groq',
+    groqOpenAiCompatibleBaseUrl,
+    'whisper-large-v3',
+    'Groq Whisper 预设，继续兼容现有云端识别配置。',
+    'https://api.groq.com/openai/v1',
+    'whisper-large-v3',
+  ),
+  domesticCompatible(
+    '国内兼容',
+    '',
+    '',
+    '填写国内 OpenAI 兼容 STT 服务提供的地址、密钥和模型名。',
+    'https://your-provider.cn/v1',
+    '供应商要求的模型 ID',
+  ),
+  custom(
+    '自定义',
+    '',
+    '',
+    '适配任意 OpenAI 兼容 STT 服务。',
+    'https://api.example.com/v1',
+    'your-model-id',
+  );
+
+  const SttPreset(
+    this.label,
+    this.defaultBaseUrl,
+    this.defaultModelId,
+    this.description,
+    this.baseUrlHint,
+    this.modelHint,
+  );
+
+  final String label;
+  final String defaultBaseUrl;
+  final String defaultModelId;
+  final String description;
+  final String baseUrlHint;
+  final String modelHint;
+}
 
 enum AiProvider {
   groq('Groq', 'https://api.groq.com/openai/v1', 'llama-3.3-70b-versatile'),
@@ -54,8 +97,10 @@ class SettingsState {
     this.languageCode = 'zh-CN',
     this.sampleRate = SampleRate.k441,
     this.smartPunctuation = true,
-    this.groqApiKey = '',
-    this.groqModel = GroqWhisperModel.largeV3,
+    this.sttPreset = SttPreset.groq,
+    this.sttApiKey = '',
+    this.sttBaseUrl = groqOpenAiCompatibleBaseUrl,
+    this.sttModelId = 'whisper-large-v3',
     this.proxyUrl = '',
     this.periodStrength = 0.8,
     this.commaStrength = 0.55,
@@ -79,8 +124,10 @@ class SettingsState {
   final String languageCode;
   final SampleRate sampleRate;
   final bool smartPunctuation;
-  final String groqApiKey;
-  final GroqWhisperModel groqModel;
+  final SttPreset sttPreset;
+  final String sttApiKey;
+  final String sttBaseUrl;
+  final String sttModelId;
   final String proxyUrl;
   final double periodStrength;
   final double commaStrength;
@@ -104,8 +151,10 @@ class SettingsState {
     String? languageCode,
     SampleRate? sampleRate,
     bool? smartPunctuation,
-    String? groqApiKey,
-    GroqWhisperModel? groqModel,
+    SttPreset? sttPreset,
+    String? sttApiKey,
+    String? sttBaseUrl,
+    String? sttModelId,
     String? proxyUrl,
     double? periodStrength,
     double? commaStrength,
@@ -130,8 +179,10 @@ class SettingsState {
       languageCode: languageCode ?? this.languageCode,
       sampleRate: sampleRate ?? this.sampleRate,
       smartPunctuation: smartPunctuation ?? this.smartPunctuation,
-      groqApiKey: groqApiKey ?? this.groqApiKey,
-      groqModel: groqModel ?? this.groqModel,
+      sttPreset: sttPreset ?? this.sttPreset,
+      sttApiKey: sttApiKey ?? this.sttApiKey,
+      sttBaseUrl: sttBaseUrl ?? this.sttBaseUrl,
+      sttModelId: sttModelId ?? this.sttModelId,
       proxyUrl: proxyUrl ?? this.proxyUrl,
       periodStrength: periodStrength ?? this.periodStrength,
       commaStrength: commaStrength ?? this.commaStrength,
@@ -158,8 +209,10 @@ class SettingsState {
       'languageCode': languageCode,
       'sampleRate': sampleRate.name,
       'smartPunctuation': smartPunctuation,
-      'groqApiKey': groqApiKey,
-      'groqModel': groqModel.name,
+      'sttPreset': sttPreset.name,
+      'sttApiKey': sttApiKey,
+      'sttBaseUrl': sttBaseUrl,
+      'sttModelId': sttModelId,
       'proxyUrl': proxyUrl,
       'periodStrength': periodStrength,
       'commaStrength': commaStrength,
@@ -181,6 +234,7 @@ class SettingsState {
   }
 
   factory SettingsState.fromMap(Map<dynamic, dynamic> map) {
+    final sttPreset = _readSttPreset(map);
     return SettingsState(
       provider: SttProvider.values.firstWhere(
         (value) => value.name == map['provider'],
@@ -192,11 +246,10 @@ class SettingsState {
         orElse: () => SampleRate.k441,
       ),
       smartPunctuation: map['smartPunctuation'] as bool? ?? true,
-      groqApiKey: map['groqApiKey'] as String? ?? '',
-      groqModel: GroqWhisperModel.values.firstWhere(
-        (value) => value.name == map['groqModel'],
-        orElse: () => GroqWhisperModel.largeV3,
-      ),
+      sttPreset: sttPreset,
+      sttApiKey: _readSttApiKey(map),
+      sttBaseUrl: _readSttBaseUrl(map, sttPreset),
+      sttModelId: _readSttModelId(map, sttPreset),
       proxyUrl: map['proxyUrl'] as String? ?? '',
       periodStrength: (map['periodStrength'] as num?)?.toDouble() ?? 0.8,
       commaStrength: (map['commaStrength'] as num?)?.toDouble() ?? 0.55,
@@ -248,53 +301,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
       unawaited(ImePlatformBridge.syncSettings(migrated));
       return migrated;
     }
-    final initialState = SettingsState(
-      provider: SttProvider.values.firstWhere(
-        (value) => value.name == box.get('provider'),
-        orElse: () => SttProvider.whisper,
-      ),
-      languageCode: box.get('languageCode') as String? ?? 'zh-CN',
-      sampleRate: SampleRate.values.firstWhere(
-        (value) => value.name == box.get('sampleRate'),
-        orElse: () => SampleRate.k441,
-      ),
-      smartPunctuation: box.get('smartPunctuation') as bool? ?? true,
-      groqApiKey: box.get('groqApiKey') as String? ?? '',
-      groqModel: GroqWhisperModel.values.firstWhere(
-        (value) => value.name == box.get('groqModel'),
-        orElse: () => GroqWhisperModel.largeV3,
-      ),
-      proxyUrl: box.get('proxyUrl') as String? ?? '',
-      periodStrength: (box.get('periodStrength') as num?)?.toDouble() ?? 0.8,
-      commaStrength: (box.get('commaStrength') as num?)?.toDouble() ?? 0.55,
-      questionStrength:
-          (box.get('questionStrength') as num?)?.toDouble() ?? 0.65,
-      exclamationStrength:
-          (box.get('exclamationStrength') as num?)?.toDouble() ?? 0.45,
-      ellipsisStrength:
-          (box.get('ellipsisStrength') as num?)?.toDouble() ?? 0.25,
-      syncPersonalLexicon: box.get('syncPersonalLexicon') as bool? ?? true,
-      syncSettings: box.get('syncSettings') as bool? ?? true,
-      syncInputHabits: box.get('syncInputHabits') as bool? ?? true,
-      skin: AppSkin.values.firstWhere(
-        (value) => value.name == box.get('skin'),
-        orElse: () => AppSkin.bamboo,
-      ),
-      lastSyncAt: switch (box.get('lastSyncAt')) {
-        final String value when value.isNotEmpty => DateTime.tryParse(value),
-        _ => null,
-      },
-      personalLexicon: _readLexiconEntries(box.get('personalLexicon')),
-      aiEnabled: box.get('aiEnabled') as bool? ?? true,
-      aiProvider: AiProvider.values.firstWhere(
-        (value) => value.name == box.get('aiProvider'),
-        orElse: () => AiProvider.groq,
-      ),
-      aiBaseUrl:
-          box.get('aiBaseUrl') as String? ?? AiProvider.groq.defaultBaseUrl,
-      aiApiKey: box.get('aiApiKey') as String? ?? '',
-      aiModel: box.get('aiModel') as String? ?? AiProvider.groq.defaultModel,
-    );
+
+    final initialState = SettingsState.fromMap(box.toMap());
     unawaited(ImePlatformBridge.syncSettings(initialState));
     return initialState;
   }
@@ -315,12 +323,30 @@ class SettingsNotifier extends Notifier<SettingsState> {
     _save(state.copyWith(smartPunctuation: value));
   }
 
-  void updateGroqApiKey(String value) {
-    _save(state.copyWith(groqApiKey: value.trim()));
+  void updateSttPreset(SttPreset preset) {
+    _save(
+      state.copyWith(
+        sttPreset: preset,
+        sttBaseUrl: preset.defaultBaseUrl.isNotEmpty
+            ? preset.defaultBaseUrl
+            : state.sttBaseUrl,
+        sttModelId: preset.defaultModelId.isNotEmpty
+            ? preset.defaultModelId
+            : state.sttModelId,
+      ),
+    );
   }
 
-  void updateGroqModel(GroqWhisperModel model) {
-    _save(state.copyWith(groqModel: model));
+  void updateSttApiKey(String value) {
+    _save(state.copyWith(sttApiKey: value.trim()));
+  }
+
+  void updateSttBaseUrl(String value) {
+    _save(state.copyWith(sttBaseUrl: value.trim()));
+  }
+
+  void updateSttModelId(String value) {
+    _save(state.copyWith(sttModelId: value.trim()));
   }
 
   void updateProxyUrl(String value) {
@@ -493,8 +519,12 @@ class SettingsNotifier extends Notifier<SettingsState> {
     box.put('languageCode', next.languageCode);
     box.put('sampleRate', next.sampleRate.name);
     box.put('smartPunctuation', next.smartPunctuation);
-    box.put('groqApiKey', next.groqApiKey);
-    box.put('groqModel', next.groqModel.name);
+    box.put('sttPreset', next.sttPreset.name);
+    box.put('sttApiKey', next.sttApiKey);
+    box.put('sttBaseUrl', next.sttBaseUrl);
+    box.put('sttModelId', next.sttModelId);
+    box.delete('groqApiKey');
+    box.delete('groqModel');
     box.put('proxyUrl', next.proxyUrl);
     box.put('periodStrength', next.periodStrength);
     box.put('commaStrength', next.commaStrength);
@@ -516,6 +546,65 @@ class SettingsNotifier extends Notifier<SettingsState> {
     box.put('aiApiKey', next.aiApiKey);
     box.put('aiModel', next.aiModel);
   }
+}
+
+SttPreset _readSttPreset(Map<dynamic, dynamic> map) {
+  final stored = map['sttPreset'] as String?;
+  if (stored != null) {
+    return SttPreset.values.firstWhere(
+      (value) => value.name == stored,
+      orElse: () => SttPreset.groq,
+    );
+  }
+
+  if ((map['groqApiKey'] as String?)?.isNotEmpty ?? false) {
+    return SttPreset.groq;
+  }
+
+  if (_legacyGroqModelId(map['groqModel']) != null) {
+    return SttPreset.groq;
+  }
+
+  return SttPreset.groq;
+}
+
+String _readSttApiKey(Map<dynamic, dynamic> map) {
+  return ((map['sttApiKey'] as String?) ?? (map['groqApiKey'] as String?) ?? '')
+      .trim();
+}
+
+String _readSttBaseUrl(Map<dynamic, dynamic> map, SttPreset preset) {
+  final explicit = (map['sttBaseUrl'] as String?)?.trim() ?? '';
+  if (explicit.isNotEmpty) {
+    return explicit;
+  }
+  return preset.defaultBaseUrl;
+}
+
+String _readSttModelId(Map<dynamic, dynamic> map, SttPreset preset) {
+  final explicit = (map['sttModelId'] as String?)?.trim() ?? '';
+  if (explicit.isNotEmpty) {
+    return explicit;
+  }
+
+  final legacy = _legacyGroqModelId(map['groqModel']);
+  if (legacy != null) {
+    return legacy;
+  }
+
+  return preset.defaultModelId;
+}
+
+String? _legacyGroqModelId(Object? raw) {
+  if (raw is! String) {
+    return null;
+  }
+
+  return switch (raw) {
+    'largeV3' || 'whisper-large-v3' => 'whisper-large-v3',
+    'largeV3Turbo' || 'whisper-large-v3-turbo' => 'whisper-large-v3-turbo',
+    _ => null,
+  };
 }
 
 List<PersonalLexiconEntry> _readLexiconEntries(Object? raw) {

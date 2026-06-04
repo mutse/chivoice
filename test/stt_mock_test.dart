@@ -177,7 +177,7 @@ void main() {
           baseUrl: 'https://api.groq.com/openai/v1',
           headers: const {'Authorization': 'Bearer gsk_test'},
         ),
-        model: GroqWhisperModel.largeV3Turbo,
+        modelId: 'whisper-large-v3-turbo',
         dio: dio,
       );
       when(
@@ -195,8 +195,38 @@ void main() {
       expect(
         captured.fields.any(
           (field) =>
-              field.key == 'model' &&
-              field.value == GroqWhisperModel.largeV3Turbo.id,
+              field.key == 'model' && field.value == 'whisper-large-v3-turbo',
+        ),
+        isTrue,
+      );
+    });
+
+    test('uses custom domestic-compatible model id when requested', () async {
+      late FormData captured;
+      final customService = WhisperStt(
+        apiProxy: ApiProxy(
+          baseUrl: 'https://stt.example.cn/v1',
+          headers: const {'Authorization': 'Bearer cn_test'},
+        ),
+        providerLabel: '国内兼容 STT',
+        modelId: 'sensevoice-v1',
+        dio: dio,
+      );
+      when(
+        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+      ).thenAnswer((invocation) async {
+        captured = invocation.namedArguments[#data] as FormData;
+        return Response<Map<String, dynamic>>(
+          requestOptions: RequestOptions(path: '/audio/transcriptions'),
+          data: {'text': '你好，世界'},
+        );
+      });
+
+      await customService.transcribe(file.path, languageCode: 'zh-CN');
+
+      expect(
+        captured.fields.any(
+          (field) => field.key == 'model' && field.value == 'sensevoice-v1',
         ),
         isTrue,
       );
@@ -230,7 +260,7 @@ void main() {
           baseUrl: 'https://api.groq.com/openai/v1',
           headers: const {'Authorization': 'Bearer gsk_test'},
         ),
-        model: GroqWhisperModel.largeV3Turbo,
+        modelId: 'whisper-large-v3-turbo',
         dio: dio,
       );
       when(() => dio.get<Map<String, dynamic>>(any())).thenAnswer(

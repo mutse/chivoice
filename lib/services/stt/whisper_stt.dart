@@ -25,14 +25,17 @@ enum GroqWhisperModel {
 class WhisperStt implements SttService {
   WhisperStt({
     required ApiProxy apiProxy,
-    this.model = GroqWhisperModel.largeV3,
+    this.modelId = _defaultGroqModelId,
+    this.providerLabel = 'Groq',
     Dio? dio,
   }) : _apiProxy = apiProxy,
        _dio = dio;
 
   final ApiProxy _apiProxy;
-  final GroqWhisperModel model;
+  final String modelId;
+  final String providerLabel;
   final Dio? _dio;
+  static const String _defaultGroqModelId = 'whisper-large-v3';
   static const String _antiHallucinationPrompt =
       'Transcribe only the words that are actually spoken in the audio. '
       'If there is no clear speech, return an empty string. '
@@ -65,9 +68,10 @@ class WhisperStt implements SttService {
     String audioFilePath, {
     required String languageCode,
   }) async {
+    _assertBaseUrl();
     if (!_apiProxy.headers.containsKey('Authorization')) {
-      throw const SttRemoteException(
-        message: 'Please add your Groq API key in Settings first.',
+      throw SttRemoteException(
+        message: 'Please add your $providerLabel API key in Settings first.',
       );
     }
 
@@ -75,7 +79,7 @@ class WhisperStt implements SttService {
     try {
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(audioFilePath),
-        'model': model.id,
+        'model': modelId,
         'language': languageCode.split('-').first.toLowerCase(),
         'temperature': '0',
         'prompt': _antiHallucinationPrompt,
@@ -104,6 +108,7 @@ class WhisperStt implements SttService {
   }
 
   Future<String> verifyConnection() async {
+    _assertBaseUrl();
     _assertApiKey();
 
     final dio = _dio ?? _apiProxy.client();
@@ -112,14 +117,14 @@ class WhisperStt implements SttService {
       final data = response.data?['data'];
       final hasModel =
           data is List &&
-          data.any((item) => item is Map && item['id'] == model.id);
+          data.any((item) => item is Map && item['id'] == modelId);
       if (!hasModel) {
         throw SttRemoteException(
           message:
-              'Groq connected, but ${model.label} is not available for this API key.',
+              '$providerLabel connected, but model $modelId is not available for this API key.',
         );
       }
-      return 'Groq connected. ${model.label} is available.';
+      return '$providerLabel connected. Model $modelId is available.';
     } on DioException catch (error) {
       throw SttRemoteException(
         statusCode: error.response?.statusCode,
@@ -135,10 +140,18 @@ class WhisperStt implements SttService {
   @override
   Future<void> stopStreaming() async {}
 
+  void _assertBaseUrl() {
+    if (_apiProxy.baseUrl.trim().isEmpty) {
+      throw SttRemoteException(
+        message: 'Please add your $providerLabel API URL in Settings first.',
+      );
+    }
+  }
+
   void _assertApiKey() {
     if (!_apiProxy.headers.containsKey('Authorization')) {
-      throw const SttRemoteException(
-        message: 'Please add your Groq API key in Settings first.',
+      throw SttRemoteException(
+        message: 'Please add your $providerLabel API key in Settings first.',
       );
     }
   }
