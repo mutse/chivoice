@@ -8,6 +8,7 @@ import '../../services/stt/google_stt.dart';
 import '../../services/stt/on_device_stt.dart';
 import '../../services/stt/stt_service.dart';
 import '../../services/stt/whisper_stt.dart';
+import '../../services/stt/cloudflare_stt.dart';
 import '../settings/personal_lexicon.dart';
 import '../settings/settings_provider.dart';
 import '../transcript/transcript_provider.dart';
@@ -83,6 +84,13 @@ final sttServiceProvider = Provider<SttService>((ref) {
     case SttProvider.google:
       return GoogleStt(apiProxy: ref.watch(googleApiProxyProvider));
     case SttProvider.whisper:
+      if (settings.sttPreset == SttPreset.cloudflare) {
+        return CloudflareStt(
+          apiProxy: ref.watch(cloudSttApiProxyProvider),
+          accountId: settings.cloudflareAccountId,
+          modelId: settings.sttModelId,
+        );
+      }
       return WhisperStt(
         apiProxy: ref.watch(cloudSttApiProxyProvider),
         providerLabel: settings.sttPreset.label,

@@ -19,6 +19,14 @@ enum SttPreset {
     'https://api.groq.com/openai/v1',
     'whisper-large-v3',
   ),
+  cloudflare(
+    'Cloudflare',
+    'https://api.cloudflare.com/client/v4',
+    '@cf/openai/whisper-large-v3-turbo',
+    'Cloudflare Workers AI：填写 Account ID 和具有 Workers AI 权限的 API Token。',
+    'https://api.cloudflare.com/client/v4',
+    '@cf/openai/whisper-large-v3-turbo',
+  ),
   domesticCompatible(
     '国内兼容',
     '',
@@ -99,6 +107,7 @@ class SettingsState {
     this.smartPunctuation = true,
     this.sttPreset = SttPreset.groq,
     this.sttApiKey = '',
+    this.cloudflareAccountId = '',
     this.sttBaseUrl = groqOpenAiCompatibleBaseUrl,
     this.sttModelId = 'whisper-large-v3',
     this.proxyUrl = '',
@@ -126,6 +135,7 @@ class SettingsState {
   final bool smartPunctuation;
   final SttPreset sttPreset;
   final String sttApiKey;
+  final String cloudflareAccountId;
   final String sttBaseUrl;
   final String sttModelId;
   final String proxyUrl;
@@ -153,6 +163,7 @@ class SettingsState {
     bool? smartPunctuation,
     SttPreset? sttPreset,
     String? sttApiKey,
+    String? cloudflareAccountId,
     String? sttBaseUrl,
     String? sttModelId,
     String? proxyUrl,
@@ -181,6 +192,7 @@ class SettingsState {
       smartPunctuation: smartPunctuation ?? this.smartPunctuation,
       sttPreset: sttPreset ?? this.sttPreset,
       sttApiKey: sttApiKey ?? this.sttApiKey,
+      cloudflareAccountId: cloudflareAccountId ?? this.cloudflareAccountId,
       sttBaseUrl: sttBaseUrl ?? this.sttBaseUrl,
       sttModelId: sttModelId ?? this.sttModelId,
       proxyUrl: proxyUrl ?? this.proxyUrl,
@@ -211,6 +223,7 @@ class SettingsState {
       'smartPunctuation': smartPunctuation,
       'sttPreset': sttPreset.name,
       'sttApiKey': sttApiKey,
+      'cloudflareAccountId': cloudflareAccountId,
       'sttBaseUrl': sttBaseUrl,
       'sttModelId': sttModelId,
       'proxyUrl': proxyUrl,
@@ -248,6 +261,7 @@ class SettingsState {
       smartPunctuation: map['smartPunctuation'] as bool? ?? true,
       sttPreset: sttPreset,
       sttApiKey: _readSttApiKey(map),
+      cloudflareAccountId: map['cloudflareAccountId'] as String? ?? '',
       sttBaseUrl: _readSttBaseUrl(map, sttPreset),
       sttModelId: _readSttModelId(map, sttPreset),
       proxyUrl: map['proxyUrl'] as String? ?? '',
@@ -335,6 +349,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
             : state.sttModelId,
       ),
     );
+  }
+
+  void updateCloudflareAccountId(String value) {
+    _save(state.copyWith(cloudflareAccountId: value.trim()));
   }
 
   void updateSttApiKey(String value) {
@@ -521,6 +539,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
     box.put('smartPunctuation', next.smartPunctuation);
     box.put('sttPreset', next.sttPreset.name);
     box.put('sttApiKey', next.sttApiKey);
+    box.put('cloudflareAccountId', next.cloudflareAccountId);
     box.put('sttBaseUrl', next.sttBaseUrl);
     box.put('sttModelId', next.sttModelId);
     box.delete('groqApiKey');

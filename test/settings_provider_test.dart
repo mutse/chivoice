@@ -34,6 +34,26 @@ void main() {
     expect(state.sttModelId, 'whisper-large-v3-turbo');
   });
 
+  test('persists and restores Cloudflare configuration', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(settingsProvider.notifier);
+    notifier.updateSttPreset(SttPreset.cloudflare);
+    notifier.updateCloudflareAccountId(' 0123456789abcdef0123456789abcdef ');
+    notifier.updateSttApiKey('cf_token');
+    final restored = SettingsState.fromMap(
+      Hive.box<dynamic>('settings').toMap(),
+    );
+    expect(restored.sttPreset, SttPreset.cloudflare);
+    expect(restored.cloudflareAccountId, '0123456789abcdef0123456789abcdef');
+    expect(restored.sttApiKey, 'cf_token');
+    expect(restored.sttModelId, '@cf/openai/whisper-large-v3-turbo');
+    expect(
+      SettingsState.fromMap(restored.toMap()).cloudflareAccountId,
+      restored.cloudflareAccountId,
+    );
+  });
+
   test('persists domestic-compatible cloud stt settings', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);

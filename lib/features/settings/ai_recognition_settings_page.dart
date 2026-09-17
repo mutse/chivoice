@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/ai/openai_compatible_client.dart';
 import '../../services/api_proxy.dart';
 import '../../services/stt/whisper_stt.dart';
+import '../../services/stt/cloudflare_stt.dart';
 import '../shared/theme.dart';
 import '../shared/widgets/ink_wash_background.dart';
 import 'settings_provider.dart';
@@ -145,7 +146,16 @@ class _AiRecognitionSettingsSectionState
         providerLabel: settings.sttPreset.label,
         modelId: settings.sttModelId,
       );
-      final message = await service.verifyConnection();
+      final message = settings.sttPreset == SttPreset.cloudflare
+          ? await CloudflareStt(
+              apiProxy: ApiProxy(
+                baseUrl: settings.sttBaseUrl,
+                headers: {'Authorization': 'Bearer ${settings.sttApiKey}'},
+              ),
+              accountId: settings.cloudflareAccountId,
+              modelId: settings.sttModelId,
+            ).verifyConnection()
+          : await service.verifyConnection();
       if (!mounted) {
         return;
       }
@@ -328,7 +338,7 @@ class _CloudRecognitionCard extends StatelessWidget {
             Text('云端 STT 配置', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
-              '支持继续使用 Groq，也支持填写国内兼容 STT 服务的 API 地址、密钥和模型名。',
+              '支持 Groq、Cloudflare Workers AI 和 OpenAI 兼容语音识别服务。',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
@@ -352,6 +362,19 @@ class _CloudRecognitionCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 14),
+            if (settings.sttPreset == SttPreset.cloudflare) ...[
+              TextFormField(
+                initialValue: settings.cloudflareAccountId,
+                decoration: const InputDecoration(
+                  labelText: 'Cloudflare Account ID',
+                  hintText: 'Cloudflare 控制台中的 32 位账户 ID',
+                ),
+                autocorrect: false,
+                enableSuggestions: false,
+                onChanged: notifier.updateCloudflareAccountId,
+              ),
+              const SizedBox(height: 14),
+            ],
             TextFormField(
               key: ValueKey('stt-baseUrl-${settings.sttPreset.name}'),
               initialValue: settings.sttBaseUrl,
@@ -368,9 +391,13 @@ class _CloudRecognitionCard extends StatelessWidget {
             TextFormField(
               key: ValueKey('stt-apiKey-${settings.sttPreset.name}'),
               initialValue: settings.sttApiKey,
-              decoration: const InputDecoration(
-                labelText: 'STT API Key',
-                hintText: 'sk-...',
+              decoration: InputDecoration(
+                labelText: settings.sttPreset == SttPreset.cloudflare
+                    ? 'Cloudflare API Token'
+                    : 'STT API Key',
+                hintText: settings.sttPreset == SttPreset.cloudflare
+                    ? '具有 Workers AI 权限的 API Token'
+                    : 'sk-...',
               ),
               obscureText: true,
               autocorrect: false,
@@ -378,17 +405,37 @@ class _CloudRecognitionCard extends StatelessWidget {
               onChanged: notifier.updateSttApiKey,
             ),
             const SizedBox(height: 14),
-            TextFormField(
-              key: ValueKey('stt-model-${settings.sttPreset.name}'),
-              initialValue: settings.sttModelId,
-              decoration: InputDecoration(
-                labelText: 'STT 模型名称',
-                hintText: settings.sttPreset.modelHint,
+            if (settings.sttPreset == SttPreset.cloudflare)
+              DropdownButtonFormField<String>(
+                initialValue: CloudflareStt.models.contains(settings.sttModelId)
+                    ? settings.sttModelId
+                    : null,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Whisper 模型'),
+                items: CloudflareStt.models
+                    .map(
+                      (model) => DropdownMenuItem(
+                        value: model,
+                        child: Text(model.replaceFirst('@cf/openai/', '')),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) notifier.updateSttModelId(value);
+                },
+              )
+            else
+              TextFormField(
+                key: ValueKey('stt-model-${settings.sttPreset.name}'),
+                initialValue: settings.sttModelId,
+                decoration: InputDecoration(
+                  labelText: 'STT 模型名称',
+                  hintText: settings.sttPreset.modelHint,
+                ),
+                autocorrect: false,
+                enableSuggestions: false,
+                onChanged: notifier.updateSttModelId,
               ),
-              autocorrect: false,
-              enableSuggestions: false,
-              onChanged: notifier.updateSttModelId,
-            ),
             const SizedBox(height: 14),
             TextFormField(
               initialValue: settings.proxyUrl,
@@ -418,7 +465,9 @@ class _CloudRecognitionCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '国内服务如提供 OpenAI 兼容转写接口，可直接填写这里的地址、Key 和模型名。',
+              settings.sttPreset == SttPreset.cloudflare
+                  ? '连接测试会发送 1 秒静音音频，消耗少量 Workers AI 配额。'
+                  : '国内服务如提供 OpenAI 兼容转写接口，可直接填写这里的地址、Key 和模型名。',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

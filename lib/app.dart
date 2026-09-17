@@ -44,31 +44,31 @@ class _VoxaAppState extends ConsumerState<VoxaApp> {
             path: '/settings',
             builder: (context, state) => const SettingsPage(),
           ),
+          GoRoute(
+            path: '/settings/ai-recognition',
+            builder: (context, state) => const AiRecognitionSettingsPage(),
+          ),
+          GoRoute(
+            path: '/settings/lexicon',
+            builder: (context, state) => const PersonalLexiconPage(),
+          ),
+          GoRoute(
+            path: '/settings/punctuation',
+            builder: (context, state) => const PunctuationPage(),
+          ),
+          GoRoute(
+            path: '/settings/sync',
+            builder: (context, state) => const CloudSyncPage(),
+          ),
+          GoRoute(
+            path: '/settings/skins',
+            builder: (context, state) => const SkinCenterPage(),
+          ),
+          GoRoute(
+            path: '/settings/about',
+            builder: (context, state) => const AboutPage(),
+          ),
         ],
-      ),
-      GoRoute(
-        path: '/settings/ai-recognition',
-        builder: (context, state) => const AiRecognitionSettingsPage(),
-      ),
-      GoRoute(
-        path: '/settings/lexicon',
-        builder: (context, state) => const PersonalLexiconPage(),
-      ),
-      GoRoute(
-        path: '/settings/punctuation',
-        builder: (context, state) => const PunctuationPage(),
-      ),
-      GoRoute(
-        path: '/settings/sync',
-        builder: (context, state) => const CloudSyncPage(),
-      ),
-      GoRoute(
-        path: '/settings/skins',
-        builder: (context, state) => const SkinCenterPage(),
-      ),
-      GoRoute(
-        path: '/settings/about',
-        builder: (context, state) => const AboutPage(),
       ),
       GoRoute(
         path: '/transcript/:id',
@@ -102,25 +102,61 @@ class VoxaScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: VoxaTabBar(
-        currentIndex: switch (location) {
-          '/history' => 1,
-          '/settings' => 2,
-          _ => 0,
-        },
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              context.go('/');
-            case 1:
-              context.go('/history');
-            case 2:
-              context.go('/settings');
-          }
-        },
-      ),
+    final currentIndex = location.startsWith('/settings')
+        ? 2
+        : location.startsWith('/history')
+        ? 1
+        : 0;
+    void navigate(int index) =>
+        context.go(['/', '/history', '/settings'][index]);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showSidebar = constraints.maxWidth >= 700;
+        return Scaffold(
+          body: Row(
+            children: [
+              if (showSidebar) ...[
+                SafeArea(
+                  right: false,
+                  child: NavigationRail(
+                    extended: constraints.maxWidth >= 1000,
+                    minExtendedWidth: 220,
+                    selectedIndex: currentIndex,
+                    onDestinationSelected: navigate,
+                    labelType: constraints.maxWidth >= 1000
+                        ? NavigationRailLabelType.none
+                        : NavigationRailLabelType.all,
+                    leading: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Icon(Icons.graphic_eq, size: 32),
+                    ),
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.mic_none),
+                        label: Text('语音'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.auto_stories),
+                        label: Text('稿库'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.tune),
+                        label: Text('设置'),
+                      ),
+                    ],
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+              ],
+              Expanded(child: child),
+            ],
+          ),
+          bottomNavigationBar: showSidebar
+              ? null
+              : VoxaTabBar(currentIndex: currentIndex, onTap: navigate),
+        );
+      },
     );
   }
 }
