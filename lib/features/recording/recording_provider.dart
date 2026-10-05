@@ -8,6 +8,7 @@ import '../../services/stt/google_stt.dart';
 import '../../services/stt/on_device_stt.dart';
 import '../../services/stt/stt_service.dart';
 import '../../services/stt/whisper_stt.dart';
+import '../../services/stt/cloudflare_stt.dart';
 import '../settings/personal_lexicon.dart';
 import '../settings/settings_provider.dart';
 import '../transcript/transcript_provider.dart';
@@ -64,13 +65,13 @@ final googleApiProxyProvider = Provider<ApiProxy>((ref) {
   return ApiProxy(baseUrl: settings.proxyUrl);
 });
 
-final groqApiProxyProvider = Provider<ApiProxy>((ref) {
+final cloudSttApiProxyProvider = Provider<ApiProxy>((ref) {
   final settings = ref.watch(settingsProvider);
   final headers = <String, String>{};
-  if (settings.groqApiKey.isNotEmpty) {
-    headers['Authorization'] = 'Bearer ${settings.groqApiKey}';
+  if (settings.sttApiKey.isNotEmpty) {
+    headers['Authorization'] = 'Bearer ${settings.sttApiKey}';
   }
-  return ApiProxy(baseUrl: groqOpenAiCompatibleBaseUrl, headers: headers);
+  return ApiProxy(baseUrl: settings.sttBaseUrl, headers: headers);
 });
 
 final liveSttProvider = Provider<SttService>((ref) => OnDeviceStt());
@@ -83,9 +84,17 @@ final sttServiceProvider = Provider<SttService>((ref) {
     case SttProvider.google:
       return GoogleStt(apiProxy: ref.watch(googleApiProxyProvider));
     case SttProvider.whisper:
+      if (settings.sttPreset == SttPreset.cloudflare) {
+        return CloudflareStt(
+          apiProxy: ref.watch(cloudSttApiProxyProvider),
+          accountId: settings.cloudflareAccountId,
+          modelId: settings.sttModelId,
+        );
+      }
       return WhisperStt(
-        apiProxy: ref.watch(groqApiProxyProvider),
-        model: settings.groqModel,
+        apiProxy: ref.watch(cloudSttApiProxyProvider),
+        providerLabel: settings.sttPreset.label,
+        modelId: settings.sttModelId,
       );
   }
 });

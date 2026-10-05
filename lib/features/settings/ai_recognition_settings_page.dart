@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/ai/openai_compatible_client.dart';
 import '../../services/api_proxy.dart';
 import '../../services/stt/whisper_stt.dart';
+import '../../services/stt/cloudflare_stt.dart';
 import '../shared/theme.dart';
 import '../shared/widgets/ink_wash_background.dart';
 import 'settings_provider.dart';
@@ -35,7 +36,7 @@ class AiRecognitionSettingsSection extends ConsumerStatefulWidget {
 
 class _AiRecognitionSettingsSectionState
     extends ConsumerState<AiRecognitionSettingsSection> {
-  bool _isTestingGroq = false;
+  bool _isTestingStt = false;
   bool _isTestingAi = false;
   bool _showAiKey = false;
 
@@ -56,11 +57,11 @@ class _AiRecognitionSettingsSectionState
           onTest: () => _testAiConnection(context, settings),
         ),
         const SizedBox(height: 16),
-        _AdvancedRecognitionCard(
+        _CloudRecognitionCard(
           settings: settings,
           notifier: notifier,
-          isTestingGroq: _isTestingGroq,
-          onTestGroq: () => _testGroqConnection(context, settings),
+          isTestingStt: _isTestingStt,
+          onTestStt: () => _testSttConnection(context, settings),
         ),
       ],
     );
@@ -112,31 +113,49 @@ class _AiRecognitionSettingsSectionState
     }
   }
 
-  Future<void> _testGroqConnection(
+  Future<void> _testSttConnection(
     BuildContext context,
     SettingsState settings,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
-    if (settings.groqApiKey.isEmpty) {
+    if (settings.sttBaseUrl.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('请先填写 STT API 地址。')));
+      return;
+    }
+    if (settings.sttApiKey.isEmpty) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('请先填写 Groq API Key。')),
+        const SnackBar(content: Text('请先填写 STT API Key。')),
       );
+      return;
+    }
+    if (settings.sttModelId.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('请先填写 STT 模型名称。')));
       return;
     }
 
     setState(() {
-      _isTestingGroq = true;
+      _isTestingStt = true;
     });
 
     try {
       final service = WhisperStt(
         apiProxy: ApiProxy(
-          baseUrl: groqOpenAiCompatibleBaseUrl,
-          headers: {'Authorization': 'Bearer ${settings.groqApiKey}'},
+          baseUrl: settings.sttBaseUrl,
+          headers: {'Authorization': 'Bearer ${settings.sttApiKey}'},
         ),
-        model: settings.groqModel,
+        providerLabel: settings.sttPreset.label,
+        modelId: settings.sttModelId,
       );
-      final message = await service.verifyConnection();
+      final message = settings.sttPreset == SttPreset.cloudflare
+          ? await CloudflareStt(
+              apiProxy: ApiProxy(
+                baseUrl: settings.sttBaseUrl,
+                headers: {'Authorization': 'Bearer ${settings.sttApiKey}'},
+              ),
+              accountId: settings.cloudflareAccountId,
+              modelId: settings.sttModelId,
+            ).verifyConnection()
+          : await service.verifyConnection();
       if (!mounted) {
         return;
       }
@@ -146,17 +165,17 @@ class _AiRecognitionSettingsSectionState
         return;
       }
       messenger.showSnackBar(
-        SnackBar(content: Text('Groq 测试失败：${error.message}')),
+        SnackBar(content: Text('STT 测试失败：${error.message}')),
       );
     } catch (error) {
       if (!mounted) {
         return;
       }
-      messenger.showSnackBar(SnackBar(content: Text('Groq 测试失败：$error')));
+      messenger.showSnackBar(SnackBar(content: Text('STT 测试失败：$error')));
     } finally {
       if (mounted) {
         setState(() {
-          _isTestingGroq = false;
+          _isTestingStt = false;
         });
       }
     }
@@ -294,68 +313,129 @@ class _AiSection extends StatelessWidget {
   }
 }
 
-class _AdvancedRecognitionCard extends StatelessWidget {
-  const _AdvancedRecognitionCard({
+class _CloudRecognitionCard extends StatelessWidget {
+  const _CloudRecognitionCard({
     required this.settings,
     required this.notifier,
-    required this.isTestingGroq,
-    required this.onTestGroq,
+    required this.isTestingStt,
+    required this.onTestStt,
   });
 
   final SettingsState settings;
   final SettingsNotifier notifier;
-  final bool isTestingGroq;
-  final VoidCallback onTestGroq;
+  final bool isTestingStt;
+  final VoidCallback onTestStt;
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('进阶识别配置', style: Theme.of(context).textTheme.titleMedium),
+            Text('云端 STT 配置', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
-              '保留现有识别能力，方便你继续使用 Groq Whisper、Google 代理或本地识别。',
+              '支持 Groq、Cloudflare Workers AI 和 OpenAI 兼容语音识别服务。',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: SttPreset.values.map((preset) {
+                final isActive = settings.sttPreset == preset;
+                return ChoiceChip(
+                  label: Text(preset.label),
+                  selected: isActive,
+                  onSelected: (_) => notifier.updateSttPreset(preset),
+                  selectedColor: primary.withValues(alpha: 0.18),
+                  side: BorderSide(color: isActive ? primary : kPaperLine),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              settings.sttPreset.description,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            if (settings.sttPreset == SttPreset.cloudflare) ...[
+              TextFormField(
+                initialValue: settings.cloudflareAccountId,
+                decoration: const InputDecoration(
+                  labelText: 'Cloudflare Account ID',
+                  hintText: 'Cloudflare 控制台中的 32 位账户 ID',
+                ),
+                autocorrect: false,
+                enableSuggestions: false,
+                onChanged: notifier.updateCloudflareAccountId,
+              ),
+              const SizedBox(height: 14),
+            ],
             TextFormField(
-              initialValue: settings.groqApiKey,
-              decoration: const InputDecoration(
-                labelText: 'Groq API Key',
-                hintText: 'gsk_...',
+              key: ValueKey('stt-baseUrl-${settings.sttPreset.name}'),
+              initialValue: settings.sttBaseUrl,
+              decoration: InputDecoration(
+                labelText: 'STT API 地址',
+                hintText: settings.sttPreset.baseUrlHint,
+              ),
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              enableSuggestions: false,
+              onChanged: notifier.updateSttBaseUrl,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              key: ValueKey('stt-apiKey-${settings.sttPreset.name}'),
+              initialValue: settings.sttApiKey,
+              decoration: InputDecoration(
+                labelText: settings.sttPreset == SttPreset.cloudflare
+                    ? 'Cloudflare API Token'
+                    : 'STT API Key',
+                hintText: settings.sttPreset == SttPreset.cloudflare
+                    ? '具有 Workers AI 权限的 API Token'
+                    : 'sk-...',
               ),
               obscureText: true,
               autocorrect: false,
               enableSuggestions: false,
-              onChanged: notifier.updateGroqApiKey,
+              onChanged: notifier.updateSttApiKey,
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<GroqWhisperModel>(
-              initialValue: settings.groqModel,
-              decoration: const InputDecoration(labelText: 'Groq Whisper 模型'),
-              items: GroqWhisperModel.values
-                  .map(
-                    (model) => DropdownMenuItem(
-                      value: model,
-                      child: Text(model.label),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  notifier.updateGroqModel(value);
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-            Text(
-              settings.groqModel.description,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            if (settings.sttPreset == SttPreset.cloudflare)
+              DropdownButtonFormField<String>(
+                initialValue: CloudflareStt.models.contains(settings.sttModelId)
+                    ? settings.sttModelId
+                    : null,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Whisper 模型'),
+                items: CloudflareStt.models
+                    .map(
+                      (model) => DropdownMenuItem(
+                        value: model,
+                        child: Text(model.replaceFirst('@cf/openai/', '')),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) notifier.updateSttModelId(value);
+                },
+              )
+            else
+              TextFormField(
+                key: ValueKey('stt-model-${settings.sttPreset.name}'),
+                initialValue: settings.sttModelId,
+                decoration: InputDecoration(
+                  labelText: 'STT 模型名称',
+                  hintText: settings.sttPreset.modelHint,
+                ),
+                autocorrect: false,
+                enableSuggestions: false,
+                onChanged: notifier.updateSttModelId,
+              ),
             const SizedBox(height: 14),
             TextFormField(
               initialValue: settings.proxyUrl,
@@ -370,8 +450,8 @@ class _AdvancedRecognitionCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: isTestingGroq ? null : onTestGroq,
-              icon: isTestingGroq
+              onPressed: isTestingStt ? null : onTestStt,
+              icon: isTestingStt
                   ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -381,7 +461,14 @@ class _AdvancedRecognitionCard extends StatelessWidget {
                       ),
                     )
                   : const Icon(Icons.network_check),
-              label: Text(isTestingGroq ? '测试中…' : '测试 Groq 连接'),
+              label: Text(isTestingStt ? '测试中…' : '测试 STT 连接'),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              settings.sttPreset == SttPreset.cloudflare
+                  ? '连接测试会发送 1 秒静音音频，消耗少量 Workers AI 配额。'
+                  : '国内服务如提供 OpenAI 兼容转写接口，可直接填写这里的地址、Key 和模型名。',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),

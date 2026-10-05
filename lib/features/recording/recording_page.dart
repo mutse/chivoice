@@ -1448,7 +1448,10 @@ List<_InfoPillData> _buildHomeChips(SettingsState settings) {
 
 String _sttModelLabel(SettingsState settings) {
   return switch (settings.provider) {
-    SttProvider.whisper => settings.groqModel.id,
+    SttProvider.whisper =>
+      settings.sttModelId.isEmpty
+          ? settings.sttPreset.label
+          : settings.sttModelId,
     SttProvider.google => 'Google Speech',
     SttProvider.onDevice => 'On-device STT',
   };
@@ -1456,7 +1459,7 @@ String _sttModelLabel(SettingsState settings) {
 
 String _sttModeDescription(SettingsState settings) {
   return switch (settings.provider) {
-    SttProvider.whisper => '云端增强转写',
+    SttProvider.whisper => '云端模型转写',
     SttProvider.google => '代理识别',
     SttProvider.onDevice => '本地实时识别',
   };

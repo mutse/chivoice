@@ -198,8 +198,8 @@ class SettingsPage extends ConsumerWidget {
         options: const [
           _SelectionItem(
             value: SttProvider.whisper,
-            title: '智能模式',
-            subtitle: 'Groq Whisper 云端增强',
+            title: '云端模型',
+            subtitle: '支持 Groq 与国内兼容 STT',
           ),
           _SelectionItem(
             value: SttProvider.google,
@@ -240,7 +240,7 @@ class SettingsPage extends ConsumerWidget {
 
   static String _providerLabel(SttProvider provider) {
     return switch (provider) {
-      SttProvider.whisper => 'Groq Whisper',
+      SttProvider.whisper => '云端 STT',
       SttProvider.google => 'Google 代理',
       SttProvider.onDevice => '本地识别',
     };
@@ -248,7 +248,7 @@ class SettingsPage extends ConsumerWidget {
 
   static String _providerShortLabel(SttProvider provider) {
     return switch (provider) {
-      SttProvider.whisper => '智能模式',
+      SttProvider.whisper => '云端模型',
       SttProvider.google => '代理模式',
       SttProvider.onDevice => '即时模式',
     };
